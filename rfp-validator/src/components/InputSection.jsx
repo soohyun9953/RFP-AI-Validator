@@ -459,6 +459,7 @@ export default function InputSection({ onAnalyze, isAnalyzing }) {
     const [guideline, setGuideline] = useState('');
     const [artifact, setArtifact] = useState('');
     const [inspectionScope, setInspectionScope] = useState('');
+    const [apiKey, setApiKey] = useState('');
     const [guidelineFile, setGuidelineFile] = useState('');
     const [artifactFile, setArtifactFile] = useState('');
     const [guidelineLoading, setGuidelineLoading] = useState(false);

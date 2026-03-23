@@ -604,16 +604,47 @@ function parseScopeIntoCheckpoints(scopeText) {
 // ══════════════════════════════════════════════════════════
 // 메인 분석 함수
 // ══════════════════════════════════════════════════════════
+// 문장 단위로 쪼개기 위한 헬퍼 함수
+function extractAllSentences(text) {
+    if (!text || !text.trim()) return [];
+    
+    // 1. 줄바꿈 기호나 마침표(.), 물음표(?), 느낌표(!) 뒤의 공백을 기준으로 분할
+    // 2. 여러 문장이 합쳐져 있는 것을 강제로 쪼겜
+    const rawSegments = text.split(/(?<=[.!?])\s+|\n/);
+    
+    const sentences = [];
+    let currentId = 1;
+    
+    for (let seg of rawSegments) {
+        // 불릿 기호, 번호 등 앞쪽의 장식 문자 제거
+        let clean = seg.replace(/^[-·○●■□▪▸※•\d\.\(\)]+\s*/, '').trim();
+        // 헤더 행이 아니며 길이가 10자 이상인 의미있는 문장만 추출
+        if (clean.length > 5 && !isDocumentHeaderRow(clean)) {
+            sentences.push({
+                id: `REQ-${String(currentId).padStart(4, '0')}`,
+                category: guessCategory(clean),
+                majorCategory: '문장 단위 추출',
+                middleCategory: '',
+                level: 4,
+                levelLabel: '개별문장',
+                content: clean,
+                path: '본문',
+                type: '필수', // 기준 문서의 모든 문장은 필수로 간주
+            });
+            currentId++;
+        }
+    }
+    return sentences;
+}
+
 export function analyzeDocuments(guidelineText, artifactText, inspectionScope) {
     try {
-        // 1) 기준문서 계층 파싱
+        // 1) 기준문서 계층 파싱 (참고용 구조)
         const guidelineStructure = parseDocumentStructure(guidelineText);
 
-        // 2) 요구사항 추출 (계층 인식)
-        let requirements = extractRequirementsFromStructure(guidelineStructure);
-        if (requirements.length === 0) {
-            requirements = fallbackExtractRequirements(guidelineText);
-        }
+        // 2) 완벽한 문장 단위 요구사항 추출 (누락 방지)
+        let requirements = extractAllSentences(guidelineText);
+        
         if (requirements.length === 0) {
             return createEmptyResult(inspectionScope);
         }
