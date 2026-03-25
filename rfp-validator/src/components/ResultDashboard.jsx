@@ -13,7 +13,7 @@ async function exportToExcel(data) {
         '기준 문서 요건': item.requirement || '',
         '카테고리': item.category || '',
         '수준': item.levelLabel || '',
-        '상태': item.status === 'Pass' ? '충족' : item.status === 'Fail' ? '미충족' : '부분충족',
+        '상태': item.status || '',
         '산출물 증빙 위치': item.location || '',
     }));
     const ws1 = XLSX.utils.json_to_sheet(rtmRows);
@@ -33,14 +33,13 @@ async function exportToExcel(data) {
         '요구사항': item.requirement || '',
         '산출물 대응 섹션': item.artifactSection || '',
         '산출물 기술 내용': (item.artifactContent || '').replace(/^"|"$/g, ''),
-        '충족률(%)': item.coverageRate ?? 0,
         '상태': item.status || '',
         '차이점': item.gap || '',
     }));
     const ws2 = XLSX.utils.json_to_sheet(detailRows);
     ws2['!cols'] = [
         { wch: 5 }, { wch: 10 }, { wch: 6 }, { wch: 15 }, { wch: 8 }, { wch: 40 },
-        { wch: 50 }, { wch: 30 }, { wch: 40 }, { wch: 10 }, { wch: 10 }, { wch: 50 },
+        { wch: 50 }, { wch: 30 }, { wch: 40 }, { wch: 10 }, { wch: 50 },
     ];
     XLSX.utils.book_append_sheet(wb, ws2, '매핑상세');
 
@@ -141,7 +140,6 @@ export default function ResultDashboard({ data }) {
                                 <th style={{ padding: '12px 16px', fontWeight: 500 }}>분류</th>
                                 <th style={{ padding: '12px 16px', fontWeight: 500 }}>기준 문서 요건</th>
                                 <th style={{ padding: '12px 16px', fontWeight: 500 }}>상태</th>
-                                <th style={{ padding: '12px 16px', fontWeight: 500 }}>충족률</th>
                                 <th style={{ padding: '12px 16px', fontWeight: 500 }}>산출물 증빙 위치</th>
                             </tr>
                         </thead>
@@ -161,18 +159,10 @@ export default function ResultDashboard({ data }) {
                                     <td style={{ padding: '12px 16px' }}>
                                         <span style={{
                                             display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', fontWeight: 600,
-                                            color: item.status === 'Pass' ? 'var(--success-color)' : item.status === 'Fail' ? 'var(--danger-color)' : 'var(--warning-color)'
+                                            color: item.status === '이행(O)' ? 'var(--success-color)' : item.status === '미이행(X)' ? 'var(--danger-color)' : 'var(--warning-color)'
                                         }}>
-                                            {item.status === 'Pass' ? <CheckCircle2 size={16} /> : item.status === 'Fail' ? <XCircle size={16} /> : <AlertTriangle size={16} />}
+                                            {item.status === '이행(O)' ? <CheckCircle2 size={16} /> : item.status === '미이행(X)' ? <XCircle size={16} /> : <AlertTriangle size={16} />}
                                             {item.status}
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: '12px 16px' }}>
-                                        <span style={{
-                                            fontSize: '13px', fontWeight: 700,
-                                            color: (item.coverageRate ?? 0) >= 70 ? 'var(--success-color)' : (item.coverageRate ?? 0) >= 30 ? 'var(--warning-color)' : 'var(--danger-color)',
-                                        }}>
-                                            {item.coverageRate ?? 0}%
                                         </span>
                                     </td>
                                     <td style={{ padding: '12px 16px', fontSize: '14px', color: 'var(--text-secondary)' }}>{item.location}</td>
@@ -215,16 +205,16 @@ export default function ResultDashboard({ data }) {
                     {/* 요약 통계 */}
                     {(() => {
                         const total = data.requirementMapping.length;
-                        const met = data.requirementMapping.filter(i => i.status === '충족').length;
-                        const partial = data.requirementMapping.filter(i => i.status === '부분충족').length;
-                        const unmet = data.requirementMapping.filter(i => i.status === '미충족').length;
+                        const met = data.requirementMapping.filter(i => i.status === '이행(O)').length;
+                        const partial = data.requirementMapping.filter(i => i.status === '부분 이행(△)').length;
+                        const unmet = data.requirementMapping.filter(i => i.status === '미이행(X)').length;
                         return (
                             <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
                                 {[
                                     { label: '전체', value: total, color: 'var(--accent-color)', bg: 'rgba(59,130,246,0.1)' },
-                                    { label: '충족', value: met, color: 'var(--success-color)', bg: 'rgba(16,185,129,0.1)' },
-                                    { label: '부분충족', value: partial, color: 'var(--warning-color)', bg: 'rgba(245,158,11,0.1)' },
-                                    { label: '미충족', value: unmet, color: 'var(--danger-color)', bg: 'rgba(239,68,68,0.1)' },
+                                    { label: '이행(O)', value: met, color: 'var(--success-color)', bg: 'rgba(16,185,129,0.1)' },
+                                    { label: '부분 이행(△)', value: partial, color: 'var(--warning-color)', bg: 'rgba(245,158,11,0.1)' },
+                                    { label: '미이행(X)', value: unmet, color: 'var(--danger-color)', bg: 'rgba(239,68,68,0.1)' },
                                 ].map((stat, i) => (
                                     <div key={i} style={{
                                         display: 'flex', alignItems: 'center', gap: '8px',
@@ -242,19 +232,19 @@ export default function ResultDashboard({ data }) {
                     {/* 매핑 카드 목록 */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                         {data.requirementMapping.map((item, idx) => {
-                            const statusColor = item.status === '충족'
+                            const statusColor = item.status === '이행(O)'
                                 ? 'var(--success-color)'
-                                : item.status === '부분충족'
+                                : item.status === '부분 이행(△)'
                                     ? 'var(--warning-color)'
                                     : 'var(--danger-color)';
-                            const statusBg = item.status === '충족'
+                            const statusBg = item.status === '이행(O)'
                                 ? 'rgba(16,185,129,0.1)'
-                                : item.status === '부분충족'
+                                : item.status === '부분 이행(△)'
                                     ? 'rgba(245,158,11,0.1)'
                                     : 'rgba(239,68,68,0.1)';
-                            const statusIcon = item.status === '충족'
+                            const statusIcon = item.status === '이행(O)'
                                 ? <CheckCircle2 size={14} />
-                                : item.status === '부분충족'
+                                : item.status === '부분 이행(△)'
                                     ? <AlertTriangle size={14} />
                                     : <XCircle size={14} />;
 
@@ -328,23 +318,6 @@ export default function ResultDashboard({ data }) {
                                         <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '6px' }}>
                                             <span style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '4px', fontSize: '12px' }}>📝 기술 내용</span>
                                             <span style={{ color: 'var(--text-primary)', lineHeight: '1.5' }}>{item.artifactContent}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* 충족률 프로그레스 바 */}
-                                    <div style={{ marginBottom: item.gap ? '14px' : '0' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '6px' }}>
-                                            <span style={{ color: 'var(--text-secondary)' }}>충족률</span>
-                                            <span style={{ fontWeight: 600, color: statusColor }}>{item.coverageRate}%</span>
-                                        </div>
-                                        <div style={{
-                                            height: '6px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', overflow: 'hidden',
-                                        }}>
-                                            <div style={{
-                                                height: '100%', width: `${item.coverageRate}%`, borderRadius: '3px',
-                                                background: statusColor,
-                                                transition: 'width 0.6s ease',
-                                            }} />
                                         </div>
                                     </div>
 

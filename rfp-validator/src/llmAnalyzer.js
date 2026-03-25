@@ -9,7 +9,8 @@ export async function analyzeDocumentsWithLLM(guidelineText, artifactText, inspe
 [핵심 규칙 - 절대 준수]
 1. 단순 제목(예: "제안요청서", "사업명:~"), 표의 헤더, 무의미한 인사말 등은 요구사항이 아니므로 추출 항목에서 완전히 제외하세요.
 2. 실제 '구현, 설계, 준수'해야 할 내용이 담긴 모든 문장을 빠짐없이 추출하여 각각 개별 항목으로 만드세요. 여러 문장을 하나로 요약하거나 합치면(Merging) 절대 안 됩니다. 반드시 문장 단위로 분할하세요.
-3. 추출된 개별 문장별로 산출물을 분석하여 '충족', '부분충족', '미충족' 중 하나로 엄격히 판정하세요. 구체적 실행 방안이 없으면 미충족입니다.
+3. 충족률(%)을 계산하지 마세요. 추출된 각 문장별로 산출물을 분석하여 오직 **'이행(O)', '부분 이행(△)', '미이행(X)'** 중 하나로 판정하세요.
+4. 산출물에서 내용이 **누락된 것은 반드시 '미이행(X)'**으로 판정하고 명시하세요. 구체적 실행 방안이나 명세가 없는 경우에도 '미이행(X)' 또는 '부분 이행(△)'으로 판정합니다.
 
 [출력 형식 제한]
 반드시 아래 JSON 형식으로만 출력하세요. (토큰 절약을 위해 rtm과 omissions 필드는 LLM 응답에서 생략합니다. requirementMapping에 집중하세요.)
@@ -27,9 +28,8 @@ export async function analyzeDocumentsWithLLM(guidelineText, artifactText, inspe
       "requirement": "<추출된 개별 요구사항 문장 원문 그대로>",
       "artifactSection": "<대응되는 산출물 페이지/위치 (없으면 '해당 없음')>",
       "artifactContent": "<산출물에 작성된 설계/수행 내용 요약 (없으면 '관련 내용 없음')>",
-      "coverageRate": <충족률(0~100 정수)>,
-      "status": "<'충족', '부분충족', '미충족' 중 택 1>",
-      "gap": "<부분충족/미충족 시 구체적 사유 및 부족한 점 (충족 시 null)>"
+      "status": "<'이행(O)', '부분 이행(△)', '미이행(X)' 중 택 1>",
+      "gap": "<부분 이행/미이행 시 구체적 사유 및 부족한 점 (이행 시 null)>"
     }
   ]
 }`;
@@ -118,16 +118,15 @@ ${inspectionScope || '없음'}
                 parsed.rtm = parsed.requirementMapping.map(req => ({
                     type: req.type || '필수',
                     requirement: req.requirement || '-',
-                    status: req.status === '충족' ? 'Pass' : req.status === '부분충족' ? 'Partial' : 'Fail',
+                    status: req.status || '미이행(X)',  // 이행(O), 부분 이행(△), 미이행(X)
                     location: req.artifactSection || '해당 없음',
                     category: req.category || '-',
-                    levelLabel: req.levelLabel || '개별문장',
-                    coverageRate: req.coverageRate || 0
+                    levelLabel: req.levelLabel || '개별문장'
                 }));
             }
             if (!parsed.omissions) {
                 parsed.omissions = parsed.requirementMapping
-                    .filter(req => req.status !== '충족')
+                    .filter(req => req.status !== '이행(O)')
                     .map(req => ({
                         title: `[ID: ${req.id || 'N/A'}] ${(req.requirement || '').substring(0, 30)}...`,
                         evidence: req.requirement || '-',
