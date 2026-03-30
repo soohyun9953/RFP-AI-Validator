@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldAlert, CheckCircle2, XCircle, FileWarning, AlertTriangle, ClipboardList, ArrowRightLeft, Download } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, XCircle, FileWarning, AlertTriangle, ClipboardList, ArrowRightLeft, Download, PenTool } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 /** 매핑 결과를 엑셀 파일로 내보내기 */
@@ -58,10 +58,26 @@ async function exportToExcel(data) {
         ];
         XLSX.utils.book_append_sheet(wb, ws3, '누락사항');
     }
+
+    // ── 시트4: 문서 품질(오탈자 등) 점검 ──
+    if (data.typos && data.typos.length > 0) {
+        const typoRows = data.typos.map((item, idx) => ({
+            '순번': idx + 1,
+            '페이지/위치': item.page || item.location || item.type || '',
+            '원문 문장 전체': item.originalText || item.errorText || '',
+            '수정 제안 문장': item.correction || '',
+            '오류 유형/사유': item.errorType || item.reason || item.context || '',
+        }));
+        const ws4 = XLSX.utils.json_to_sheet(typoRows);
+        ws4['!cols'] = [
+            { wch: 5 }, { wch: 20 }, { wch: 30 }, { wch: 30 }, { wch: 60 },
+        ];
+        XLSX.utils.book_append_sheet(wb, ws4, '교정교열_결과');
+    }
     // 저장 위치 선택 → 다운로드
     const now = new Date();
     const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
-    const fileName = `RFP_검증결과_${dateStr}.xlsx`;
+    const fileName = `기준문서_검증결과_${dateStr}.xlsx`;
 
     // File System Access API 지원 시 → 저장 위치 선택 대화상자
     if (window.showSaveFilePicker) {
@@ -93,7 +109,7 @@ export default function ResultDashboard({ data }) {
     if (!data) return null;
 
     return (
-        <div className="glass-panel animate-fade-in" style={{ flex: 2, display: 'flex', flexDirection: 'column', padding: '24px', gap: '24px', overflowY: 'auto' }}>
+        <div className="glass-panel animate-fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '24px', gap: '24px', overflowY: 'auto' }}>
             {/* 점검범위 표시 */}
             {data.inspectionScope && (
                 <section style={{ padding: '14px 20px', background: 'rgba(59, 130, 246, 0.08)', borderRadius: '10px', border: '1px solid rgba(59, 130, 246, 0.2)', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
@@ -119,7 +135,26 @@ export default function ResultDashboard({ data }) {
                 <div className="glass-panel" style={{ flex: 1, padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                         <ShieldAlert size={20} color="var(--warning-color)" />
-                        <h3 style={{ margin: 0, fontSize: '18px' }}>평가 요약</h3>
+                        <h3 style={{ margin: 0, fontSize: '18px', flex: 1 }}>종합 평가 보고서</h3>
+                        <button
+                            onClick={() => exportToExcel(data)}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: '6px',
+                                padding: '8px 16px', fontSize: '13px', fontWeight: 600,
+                                background: 'rgba(34, 197, 94, 0.12)',
+                                color: '#22c55e',
+                                border: '1px solid rgba(34, 197, 94, 0.3)',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                flexShrink: 0,
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(34,197,94,0.2)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(34,197,94,0.12)'}
+                        >
+                            <Download size={16} />
+                            결과 엑셀 저장
+                        </button>
                     </div>
                     <p style={{ margin: 0, lineHeight: '1.6', color: 'var(--text-primary)', fontSize: '15px' }}>
                         {data.summary}
@@ -128,7 +163,8 @@ export default function ResultDashboard({ data }) {
             </section>
 
             {/* 2. 요구사항 추적 매트릭스 (RTM) */}
-            <section className="glass-panel" style={{ padding: '24px' }}>
+            {data.rtm && data.rtm.length > 0 && (
+                <section className="glass-panel" style={{ padding: '24px' }}>
                 <h3 style={{ margin: '0 0 16px', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <CheckCircle2 size={20} color="var(--accent-color)" />
                     요구사항 매핑 현황 (Semantic Map)
@@ -171,7 +207,8 @@ export default function ResultDashboard({ data }) {
                         </tbody>
                     </table>
                 </div>
-            </section>
+                </section>
+            )}
 
             {/* 2.5 요구사항별 산출물 매핑 상세 */}
             {data.requirementMapping && data.requirementMapping.length > 0 && (
@@ -181,25 +218,6 @@ export default function ResultDashboard({ data }) {
                             <ArrowRightLeft size={20} color="var(--accent-color)" />
                             요구사항별 산출물 매핑 상세
                         </h3>
-                        <button
-                            onClick={() => exportToExcel(data)}
-                            style={{
-                                display: 'flex', alignItems: 'center', gap: '6px',
-                                padding: '8px 16px', fontSize: '13px', fontWeight: 600,
-                                background: 'rgba(34, 197, 94, 0.12)',
-                                color: '#22c55e',
-                                border: '1px solid rgba(34, 197, 94, 0.3)',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                flexShrink: 0,
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(34,197,94,0.2)'}
-                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(34,197,94,0.12)'}
-                        >
-                            <Download size={16} />
-                            엑셀 저장
-                        </button>
                     </div>
 
                     {/* 요약 통계 */}
@@ -340,7 +358,8 @@ export default function ResultDashboard({ data }) {
             )}
 
             {/* 3. 주요 누락/비준수 상세 */}
-            <section className="glass-panel" style={{ padding: '24px' }}>
+            {data.omissions && data.omissions.length > 0 && (
+                <section className="glass-panel" style={{ padding: '24px' }}>
                 <h3 style={{ margin: '0 0 16px', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <FileWarning size={20} color="var(--danger-color)" />
                     주요 누락(Omission) 및 비준수 사항
@@ -373,7 +392,42 @@ export default function ResultDashboard({ data }) {
                         </div>
                     ))}
                 </div>
-            </section>
+                </section>
+            )}
+
+            {/* 4. 산출물 오탈자 및 용어 점검 결과 */}
+            {data.typos && data.typos.length > 0 && (
+                <section className="glass-panel" style={{ padding: '24px' }}>
+                    <h3 style={{ margin: '0 0 16px', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <PenTool size={20} color="var(--warning-color)" />
+                        ISMP 산출물 전문 교정/교열 결과
+                    </h3>
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+                            <thead>
+                                <tr style={{ borderBottom: '1px solid var(--panel-border)', color: 'var(--text-secondary)' }}>
+                                    <th style={{ padding: '12px 16px', fontWeight: 500, width: '60px' }}>순번</th>
+                                    <th style={{ padding: '12px 16px', fontWeight: 500, width: '15%' }}>위치/페이지</th>
+                                    <th style={{ padding: '12px 16px', fontWeight: 500, width: '30%' }}>원문 문장 전체</th>
+                                    <th style={{ padding: '12px 16px', fontWeight: 500, width: '30%' }}>수정 제안 문장</th>
+                                    <th style={{ padding: '12px 16px', fontWeight: 500, width: '25%' }}>오류 유형/사유</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {data.typos.map((typo, idx) => (
+                                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', backgroundColor: idx % 2 === 0 ? 'rgba(0,0,0,0.1)' : 'transparent' }}>
+                                        <td style={{ padding: '12px 16px' }}>{idx + 1}</td>
+                                        <td style={{ padding: '12px 16px', color: 'var(--warning-color)' }}>{typo.page || typo.location || typo.type}</td>
+                                        <td style={{ padding: '12px 16px', color: 'var(--danger-color)', textDecoration: 'none' }}>{typo.originalText || typo.errorText}</td>
+                                        <td style={{ padding: '12px 16px', color: 'var(--success-color)', fontWeight: 600 }}>{typo.correction}</td>
+                                        <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{typo.errorType || typo.reason || typo.context}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            )}
         </div>
     );
 }

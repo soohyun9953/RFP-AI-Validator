@@ -456,16 +456,21 @@ function FileUploadArea({ label, icon: Icon, fileName, onFileSelect, onFileClear
 
 // ── 메인 InputSection ──────────────────────────────────────
 export default function InputSection({ onAnalyze, isAnalyzing }) {
+    const [activeTab, setActiveTab] = useState(0);
     const [guideline, setGuideline] = useState('');
     const [artifact, setArtifact] = useState('');
     const [inspectionScope, setInspectionScope] = useState('');
+    const [glossary, setGlossary] = useState('');
     const [apiKey, setApiKey] = useState('');
     const [guidelineFile, setGuidelineFile] = useState('');
     const [artifactFile, setArtifactFile] = useState('');
+    const [glossaryFile, setGlossaryFile] = useState('');
     const [guidelineLoading, setGuidelineLoading] = useState(false);
     const [artifactLoading, setArtifactLoading] = useState(false);
+    const [glossaryLoading, setGlossaryLoading] = useState(false);
     const [guidelineError, setGuidelineError] = useState(null);
     const [artifactError, setArtifactError] = useState(null);
+    const [glossaryError, setGlossaryError] = useState(null);
 
     const handleGuidelineFile = (name, content, loading = false, error = null) => {
         setGuidelineFile(name);
@@ -483,11 +488,19 @@ export default function InputSection({ onAnalyze, isAnalyzing }) {
         if (error) setArtifact('');
     };
 
+    const handleGlossaryFile = (name, content, loading = false, error = null) => {
+        setGlossaryFile(name);
+        setGlossaryLoading(loading);
+        setGlossaryError(error);
+        if (content) setGlossary(content);
+        if (error) setGlossary('');
+    };
+
     return (
         <div className="glass-panel animate-fade-in" style={{
             flex: 1, display: 'flex', flexDirection: 'column',
             padding: '24px', gap: '20px',
-            minWidth: '400px', maxWidth: '500px',
+            minWidth: '400px',
         }}>
             <div style={{
                 display: 'flex', alignItems: 'center', gap: '8px',
@@ -524,58 +537,107 @@ export default function InputSection({ onAnalyze, isAnalyzing }) {
                 </div>
             </div>
 
-            <FileUploadArea
-                label="1. 기준 문서 (가이드라인 / RFP)"
-                icon={Target}
-                fileName={guidelineFile}
-                onFileSelect={handleGuidelineFile}
-                onFileClear={() => { setGuidelineFile(''); setGuideline(''); setGuidelineError(null); }}
-                textValue={guideline}
-                onTextChange={setGuideline}
-                placeholder="파일을 드래그하여 놓거나, 파일 선택 버튼을 클릭하세요.&#10;직접 텍스트를 붙여넣을 수도 있습니다."
-                isLoading={guidelineLoading}
-                loadError={guidelineError}
-            />
+            {/* 탭 헤더 */}
+            <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--panel-border)', paddingBottom: '8px', marginBottom: '8px' }}>
+                {[
+                    { id: 0, label: '1. 기준 문서', icon: Target, hasData: !!guideline || !!guidelineFile },
+                    { id: 1, label: '2. 산출물', icon: FileText, hasData: !!artifact || !!artifactFile },
+                    { id: 2, label: '3. 용어 사전', icon: FileSpreadsheet, hasData: !!glossary || !!glossaryFile },
+                    { id: 3, label: '4. 점검 범위', icon: ClipboardList, hasData: !!inspectionScope }
+                ].map(tab => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        style={{
+                            flex: 1, padding: '12px 0',
+                            background: activeTab === tab.id ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                            border: '1px solid', borderColor: activeTab === tab.id ? 'var(--accent-color)' : 'transparent',
+                            borderRadius: '8px',
+                            color: activeTab === tab.id ? 'var(--accent-color)' : 'var(--text-secondary)',
+                            fontWeight: activeTab === tab.id ? 600 : 500, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                            transition: 'all 0.2s', fontSize: '13px', position: 'relative'
+                        }}
+                    >
+                        <tab.icon size={16} />
+                        {tab.label}
+                        {tab.hasData && <span style={{ position: 'absolute', top: '8px', right: '8px', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--success-color)' }} />}
+                    </button>
+                ))}
+            </div>
 
-            <FileUploadArea
-                label="2. 검증할 산출물 (수행 계획서 등)"
-                icon={FileText}
-                fileName={artifactFile}
-                onFileSelect={handleArtifactFile}
-                onFileClear={() => { setArtifactFile(''); setArtifact(''); setArtifactError(null); }}
-                textValue={artifact}
-                onTextChange={setArtifact}
-                placeholder="파일을 드래그하여 놓거나, 파일 선택 버튼을 클릭하세요.&#10;직접 텍스트를 붙여넣을 수도 있습니다."
-                isLoading={artifactLoading}
-                loadError={artifactError}
-            />
-
-            {/* 3. 점검범위 */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{
-                    fontSize: '14px', fontWeight: 500, color: 'var(--text-secondary)',
-                    display: 'flex', alignItems: 'center', gap: '6px',
-                }}>
-                    <ClipboardList size={16} /> 3. 점검범위 및 주요 점검 사항 (선택)
-                </label>
-                <textarea
-                    placeholder="예: CSR-011을 기준으로 검증해주세요."
-                    value={inspectionScope}
-                    onChange={e => setInspectionScope(e.target.value)}
-                    style={{ resize: 'none', lineHeight: '1.5', minHeight: '90px', maxHeight: '140px' }}
-                />
+            {/* 탭 컨텐츠 */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                {activeTab === 0 && (
+                    <FileUploadArea
+                        label="비교/검증의 잣대가 될 기준 문서 (RFP, 분석서 등)"
+                        icon={Target}
+                        fileName={guidelineFile}
+                        onFileSelect={handleGuidelineFile}
+                        onFileClear={() => { setGuidelineFile(''); setGuideline(''); setGuidelineError(null); }}
+                        textValue={guideline}
+                        onTextChange={setGuideline}
+                        placeholder="기준 문서를 업로드하거나 좌측 텍스트를 입력하세요."
+                        isLoading={guidelineLoading}
+                        loadError={guidelineError}
+                    />
+                )}
+                {activeTab === 1 && (
+                    <FileUploadArea
+                        label="진단 및 오류 검증이 필요한 결과 산출물 단위"
+                        icon={FileText}
+                        fileName={artifactFile}
+                        onFileSelect={handleArtifactFile}
+                        onFileClear={() => { setArtifactFile(''); setArtifact(''); setArtifactError(null); }}
+                        textValue={artifact}
+                        onTextChange={setArtifact}
+                        placeholder="검증할 산출물을 여기에 끌어다 놓거나 작성하세요."
+                        isLoading={artifactLoading}
+                        loadError={artifactError}
+                    />
+                )}
+                {activeTab === 2 && (
+                    <FileUploadArea
+                        label="최우선 기준이 되는 맞춤형 도메인 용어집"
+                        icon={FileSpreadsheet}
+                        fileName={glossaryFile}
+                        onFileSelect={handleGlossaryFile}
+                        onFileClear={() => { setGlossaryFile(''); setGlossary(''); setGlossaryError(null); }}
+                        textValue={glossary}
+                        onTextChange={setGlossary}
+                        placeholder="커스텀 용어 사전을 엑셀/PDF로 업로드하거나 직접 붙여넣으세요."
+                        isLoading={glossaryLoading}
+                        loadError={glossaryError}
+                    />
+                )}
+                {activeTab === 3 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, background: 'var(--bg-secondary)', padding: '16px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                        <label style={{
+                            fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)',
+                            display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px'
+                        }}>
+                            <ClipboardList size={18} color="var(--accent-color)" /> 검증 포커스 영역 및 개별 테스트 규칙
+                        </label>
+                        <textarea
+                            placeholder="예시: CSR-011 요구사항 항목만을 중심으로 집중 점검하세요. 목차 일관성보다 문장 간 논리성에 더 큰 가중치를 두어 검사해주세요."
+                            value={inspectionScope}
+                            onChange={e => setInspectionScope(e.target.value)}
+                            style={{ flex: 1, resize: 'none', lineHeight: '1.6', fontSize: '15px' }}
+                        />
+                    </div>
+                )}
             </div>
 
             <button
                 className="primary"
-                onClick={() => onAnalyze(guideline, artifact, inspectionScope)}
-                disabled={isAnalyzing || guidelineLoading || artifactLoading || (!guideline && !artifact)}
+                onClick={() => onAnalyze(guideline, artifact, inspectionScope, glossary)}
+                disabled={isAnalyzing || guidelineLoading || artifactLoading || glossaryLoading || (!guideline && !artifact && !glossary)}
                 style={{
                     marginTop: '8px',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     gap: '8px', padding: '16px', fontSize: '16px',
-                    opacity: (isAnalyzing || guidelineLoading || artifactLoading || (!guideline && !artifact)) ? 0.6 : 1,
-                    cursor: (isAnalyzing || guidelineLoading || artifactLoading || (!guideline && !artifact)) ? 'not-allowed' : 'pointer',
+                    opacity: (isAnalyzing || guidelineLoading || artifactLoading || glossaryLoading || (!guideline && !artifact && !glossary)) ? 0.6 : 1,
+                    cursor: (isAnalyzing || guidelineLoading || artifactLoading || glossaryLoading || (!guideline && !artifact && !glossary)) ? 'not-allowed' : 'pointer',
                 }}
             >
                 {isAnalyzing ? (

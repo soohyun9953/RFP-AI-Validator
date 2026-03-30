@@ -16,14 +16,14 @@ function App() {
     localStorage.setItem('gemini_api_key', apiKey);
   }, [apiKey]);
 
-  const handleAnalyze = useCallback(async (guideline, artifact, inspectionScope) => {
+  const handleAnalyze = useCallback(async (guideline, artifact, inspectionScope, glossary) => {
     setIsAnalyzing(true);
     setResultData(null);
 
     try {
       if (apiKey && apiKey.startsWith('AIza')) {
         setIsLlmMode(true);
-        const result = await analyzeDocumentsWithLLM(guideline, artifact, inspectionScope, apiKey);
+        const result = await analyzeDocumentsWithLLM(guideline, artifact, inspectionScope, apiKey, glossary);
         setResultData(result);
         setIsAnalyzing(false);
       } else {
@@ -31,7 +31,7 @@ function App() {
         // 분석 시뮬레이션 (입력 텍스트를 실제로 파싱하여 결과 생성)
         setTimeout(() => {
           try {
-            const result = analyzeDocuments(guideline, artifact, inspectionScope);
+            const result = analyzeDocuments(guideline, artifact, inspectionScope, glossary);
             setResultData(result);
           } catch (e) {
             console.error('[App] 분석 오류:', e);
@@ -42,6 +42,7 @@ function App() {
               rtm: [],
               requirementMapping: [],
               omissions: [],
+              typos: [],
             });
           }
           setIsAnalyzing(false);
@@ -56,6 +57,7 @@ function App() {
             rtm: [],
             requirementMapping: [],
             omissions: [],
+            typos: [],
         });
         setIsAnalyzing(false);
     }
@@ -66,9 +68,9 @@ function App() {
       <header className="glass-panel" style={{ padding: '20px 30px', display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>
         <ShieldCheck size={36} color="var(--success-color)" />
         <div style={{ flex: 1 }}>
-          <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 600, letterSpacing: '-0.5px' }}>RFP AI Validator</h1>
+          <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 600, letterSpacing: '-0.5px' }}>AI Document Validator</h1>
           <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)', fontSize: '14px' }}>
-            수석 규제 감사관 - 제안요청서 &amp; 가이드라인 자동 검증 시스템
+            수석 감리 전문가 - 다단계 산출물 및 기준문서 자동 검증 시스템
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.05)', padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
