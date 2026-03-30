@@ -92,10 +92,10 @@ export async function analyzeDocumentsWithLLM(guidelineText, artifactText, inspe
 [시스템 지시사항]
 ${systemPrompt}
 
-[입력 데이터]${glossaryText ? `\n--- 용어 사전 ---\n${glossaryText.substring(0, 10000)}` : ''}
+[입력 데이터]${glossaryText ? `\n--- 용어 사전 ---\n${glossaryText.substring(0, 50000)}` : ''}
 
 --- 산출물 ---
-${(artifactText || '').substring(0, 40000)}
+${(artifactText || '').substring(0, 2000000)}
 
 --- 점검 범위 ---
 ${inspectionScope || '없음'}
@@ -103,13 +103,13 @@ ${inspectionScope || '없음'}
 [시스템 지시사항]
 ${systemPrompt}
 
-[입력 데이터]${glossaryText ? `\n--- 용어 사전 ---\n${glossaryText.substring(0, 10000)}` : ''}
+[입력 데이터]${glossaryText ? `\n--- 용어 사전 ---\n${glossaryText.substring(0, 50000)}` : ''}
 
 --- 기준 문서 ---
-${(guidelineText || '').substring(0, 20000)}
+${(guidelineText || '').substring(0, 500000)}
 
 --- 산출물 ---
-${(artifactText || '').substring(0, 40000)}
+${(artifactText || '').substring(0, 2000000)}
 
 --- 점검 범위 (해당 내용이 있으면 위주로 더 엄격히 볼 것) ---
 ${inspectionScope || '없음'}
