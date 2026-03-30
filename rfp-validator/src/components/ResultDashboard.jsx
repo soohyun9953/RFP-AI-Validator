@@ -1,108 +1,161 @@
 import React from 'react';
 import { ShieldAlert, CheckCircle2, XCircle, FileWarning, AlertTriangle, ClipboardList, ArrowRightLeft, Download, PenTool } from 'lucide-react';
-import * as XLSX from 'xlsx';
-
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 /** 매핑 결과를 엑셀 파일로 내보내기 */
 async function exportToExcel(data) {
-    const wb = XLSX.utils.book_new();
+    const wb = new ExcelJS.Workbook();
+    
+    // helper 
+    const addSheet = (sheetName, headers, rowsData) => {
+        const ws = wb.addWorksheet(sheetName, {
+            views: [{ state: 'frozen', xSplit: 0, ySplit: 1 }] // 1행(헤더) 고정
+        });
+        
+        // set headers
+        ws.columns = headers;
+        
+        // add rows
+        ws.addRows(rowsData);
+        
+        // auto filter (A1: lastColumn1)
+        ws.autoFilter = {
+            from: { row: 1, column: 1 },
+            to: { row: 1, column: headers.length }
+        };
+        
+        // style header
+        ws.getRow(1).font = { bold: true };
+        ws.getRow(1).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFEFEFEF' }
+        };
+        // apply border to header
+        ws.getRow(1).eachCell(cell => {
+            cell.border = {
+                top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'}
+            };
+        });
+    };
 
     // ── 시트1: 요구사항 매핑 현황 (RTM) ──
+    const rtmHeaders = [
+        { header: '번호', key: '번호', width: 6 },
+        { header: '분류', key: '분류', width: 8 },
+        { header: '기준 문서 요건', key: '기준문서요건', width: 50 },
+        { header: '카테고리', key: '카테고리', width: 15 },
+        { header: '수준', key: '수준', width: 10 },
+        { header: '상태', key: '상태', width: 12 },
+        { header: '산출물 증빙 위치', key: '산출물증빙위치', width: 40 }
+    ];
     const rtmRows = (data.rtm || []).map((item, idx) => ({
         '번호': idx + 1,
         '분류': item.type || '필수',
-        '기준 문서 요건': item.requirement || '',
+        '기준문서요건': item.requirement || '',
         '카테고리': item.category || '',
         '수준': item.levelLabel || '',
         '상태': item.status || '',
-        '산출물 증빙 위치': item.location || '',
+        '산출물증빙위치': item.location || '',
     }));
-    const ws1 = XLSX.utils.json_to_sheet(rtmRows);
-    ws1['!cols'] = [
-        { wch: 5 }, { wch: 6 }, { wch: 50 }, { wch: 15 }, { wch: 8 }, { wch: 10 }, { wch: 40 },
-    ];
-    XLSX.utils.book_append_sheet(wb, ws1, '매핑현황(RTM)');
+    addSheet('매핑현황(RTM)', rtmHeaders, rtmRows);
 
     // ── 시트2: 매핑 상세 ──
+    const detailHeaders = [
+        { header: '번호', key: '번호', width: 6 },
+        { header: 'ID', key: 'ID', width: 12 },
+        { header: '분류', key: '분류', width: 8 },
+        { header: '카테고리', key: '카테고리', width: 15 },
+        { header: '수준', key: '수준', width: 10 },
+        { header: '계층 경로', key: '계층경로', width: 40 },
+        { header: '요구사항', key: '요구사항', width: 50 },
+        { header: '산출물 대응 섹션', key: '산출물대응섹션', width: 30 },
+        { header: '산출물 기술 내용', key: '산출물기술내용', width: 40 },
+        { header: '상태', key: '상태', width: 12 },
+        { header: '차이점', key: '차이점', width: 50 }
+    ];
     const detailRows = (data.requirementMapping || []).map((item, idx) => ({
         '번호': idx + 1,
         'ID': item.id || '',
         '분류': item.type || '필수',
         '카테고리': item.category || '',
         '수준': item.levelLabel || '',
-        '계층 경로': item.path || '',
+        '계층경로': item.path || '',
         '요구사항': item.requirement || '',
-        '산출물 대응 섹션': item.artifactSection || '',
-        '산출물 기술 내용': (item.artifactContent || '').replace(/^"|"$/g, ''),
+        '산출물대응섹션': item.artifactSection || '',
+        '산출물기술내용': (item.artifactContent || '').replace(/^"|"$/g, ''),
         '상태': item.status || '',
         '차이점': item.gap || '',
     }));
-    const ws2 = XLSX.utils.json_to_sheet(detailRows);
-    ws2['!cols'] = [
-        { wch: 5 }, { wch: 10 }, { wch: 6 }, { wch: 15 }, { wch: 8 }, { wch: 40 },
-        { wch: 50 }, { wch: 30 }, { wch: 40 }, { wch: 10 }, { wch: 50 },
-    ];
-    XLSX.utils.book_append_sheet(wb, ws2, '매핑상세');
+    addSheet('매핑상세', detailHeaders, detailRows);
 
     // ── 시트3: 누락 사항 ──
     if (data.omissions && data.omissions.length > 0) {
-        const omissionRows = data.omissions.map((item, idx) => ({
+        const omiHeaders = [
+            { header: '번호', key: '번호', width: 6 },
+            { header: '항목', key: '항목', width: 30 },
+            { header: '근거', key: '근거', width: 50 },
+            { header: '사유', key: '사유', width: 50 },
+            { header: '권고사항', key: '권고사항', width: 50 }
+        ];
+        const omiRows = data.omissions.map((item, idx) => ({
             '번호': idx + 1,
             '항목': item.title || '',
             '근거': item.evidence || '',
             '사유': item.reason || '',
             '권고사항': item.recommendation || '',
         }));
-        const ws3 = XLSX.utils.json_to_sheet(omissionRows);
-        ws3['!cols'] = [
-            { wch: 5 }, { wch: 30 }, { wch: 50 }, { wch: 50 }, { wch: 50 },
-        ];
-        XLSX.utils.book_append_sheet(wb, ws3, '누락사항');
+        addSheet('누락사항', omiHeaders, omiRows);
     }
 
     // ── 시트4: 문서 품질(오탈자 등) 점검 ──
     if (data.typos && data.typos.length > 0) {
+        const typoHeaders = [
+            { header: '순번', key: '순번', width: 6 },
+            { header: '페이지/위치', key: '위치', width: 25 },
+            { header: '원문 문장 전체', key: '원문', width: 40 },
+            { header: '수정 제안 문장', key: '수정', width: 40 },
+            { header: '오류 유형/사유', key: '사유', width: 60 }
+        ];
         const typoRows = data.typos.map((item, idx) => ({
             '순번': idx + 1,
-            '페이지/위치': item.page || item.location || item.type || '',
-            '원문 문장 전체': item.originalText || item.errorText || '',
-            '수정 제안 문장': item.correction || '',
-            '오류 유형/사유': item.errorType || item.reason || item.context || '',
+            '위치': item.page || item.location || item.type || '',
+            '원문': item.originalText || item.errorText || '',
+            '수정': item.correction || '',
+            '사유': item.errorType || item.reason || item.context || '',
         }));
-        const ws4 = XLSX.utils.json_to_sheet(typoRows);
-        ws4['!cols'] = [
-            { wch: 5 }, { wch: 20 }, { wch: 30 }, { wch: 30 }, { wch: 60 },
-        ];
-        XLSX.utils.book_append_sheet(wb, ws4, '교정교열_결과');
+        addSheet('교정교열_결과', typoHeaders, typoRows);
     }
-    // 저장 위치 선택 → 다운로드
+
     const now = new Date();
     const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
     const fileName = `기준문서_검증결과_${dateStr}.xlsx`;
 
-    // File System Access API 지원 시 → 저장 위치 선택 대화상자
-    if (window.showSaveFilePicker) {
-        try {
-            const handle = await window.showSaveFilePicker({
-                suggestedName: fileName,
-                types: [{
-                    description: 'Excel 파일',
-                    accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] },
-                }],
-            });
-            const writable = await handle.createWritable();
-            const xlsxData = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-            await writable.write(new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-            await writable.close();
-            return;
-        } catch (err) {
-            // 사용자가 취소했거나 API 오류 → 폴백
-            if (err.name === 'AbortError') return; // 사용자 취소
-            console.warn('showSaveFilePicker 실패, 기본 다운로드로 전환:', err);
+    try {
+        const buffer = await wb.xlsx.writeBuffer();
+        if (window.showSaveFilePicker) {
+            try {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: fileName,
+                    types: [{
+                        description: 'Excel 파일',
+                        accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] },
+                    }],
+                });
+                const writable = await handle.createWritable();
+                await writable.write(buffer);
+                await writable.close();
+                return;
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                console.warn('showSaveFilePicker fallback:', err);
+            }
         }
+        
+        saveAs(new Blob([buffer]), fileName);
+    } catch (e) {
+        console.error('Excel export failed:', e);
     }
-
-    // 폴백: 기본 다운로드 (브라우저 기본 다운로드 폴더)
-    XLSX.writeFile(wb, fileName);
 }
 
 export default function ResultDashboard({ data }) {
@@ -122,8 +175,8 @@ export default function ResultDashboard({ data }) {
             )}
 
             {/* 1. 종합 준수 현황 */}
-            <section style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
-                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: '200px' }}>
+            <section style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                     <h3 style={{ margin: '0 0 16px', fontSize: '16px', color: 'var(--text-secondary)' }}>전체 준수율</h3>
                     <div style={{ position: 'relative', width: '120px', height: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', background: `conic-gradient(var(--success-color) ${data.score}%, rgba(255,255,255,0.1) 0)` }}>
                         <div style={{ position: 'absolute', width: '90px', height: '90px', background: 'var(--panel-bg)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', fontWeight: 'bold' }}>
@@ -132,7 +185,7 @@ export default function ResultDashboard({ data }) {
                     </div>
                 </div>
 
-                <div className="glass-panel" style={{ flex: 1, padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                         <ShieldAlert size={20} color="var(--warning-color)" />
                         <h3 style={{ margin: 0, fontSize: '18px', flex: 1 }}>종합 평가 보고서</h3>
