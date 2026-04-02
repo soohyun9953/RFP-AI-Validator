@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import './index.css';
 import { ShieldCheck, ArrowRight, Loader2, Key, HelpCircle, X, BookOpen } from 'lucide-react';
+import { Analytics } from "@vercel/analytics/react";
 import InputSection from './components/InputSection';
 import ResultDashboard from './components/ResultDashboard';
 import { analyzeDocuments } from './mockAnalyzer';
@@ -153,6 +154,7 @@ function App() {
             </div>
         </div>
       )}
+      <Analytics />
     </div>
   );
 }

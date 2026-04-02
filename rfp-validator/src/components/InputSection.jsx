@@ -159,14 +159,26 @@ async function extractTextFromPPTX(file) {
 
     for (const fileName of slideFiles) {
         const content = await zip.files[fileName].async('string');
-        const regex = /<a:t.*?>([\s\S]*?)<\/a:t>/g;
-        let match;
-        const slideText = [];
-        while ((match = regex.exec(content)) !== null) {
-            slideText.push(match[1].replace(/<[^>]+>/g, '')); 
+        const paragraphRegex = /<a:p[^>]*>([\s\S]*?)<\/a:p>/g;
+        let pMatch;
+        const slideParagraphs = [];
+
+        while ((pMatch = paragraphRegex.exec(content)) !== null) {
+            const pContent = pMatch[1];
+            const textRegex = /<a:t.*?>(.*?)<\/a:t>/g;
+            let tMatch;
+            const textRuns = [];
+            while ((tMatch = textRegex.exec(pContent)) !== null) {
+                textRuns.push(tMatch[1].replace(/<[^>]+>/g, ''));
+            }
+            if (textRuns.length > 0) {
+                // 문단 내의 텍스트 조각들은 공백 없이 이어붙임 (분리된 단어 복원)
+                slideParagraphs.push(textRuns.join(''));
+            }
         }
-        if (slideText.length > 0) {
-            textBlocks.push(`[슬라이드 ${fileName.match(/\d+/)[0]}]\n` + slideText.join(' '));
+
+        if (slideParagraphs.length > 0) {
+            textBlocks.push(`[슬라이드 ${fileName.match(/\d+/)[0]}]\n` + slideParagraphs.join('\n'));
         }
     }
     
@@ -190,17 +202,28 @@ async function extractTextFromHWPX(file) {
 
     for (const fileName of sectionFiles) {
         const content = await zip.files[fileName].async('string');
-        const regex = /<hp:t.*?>([\s\S]*?)<\/hp:t>/g;
-        let match;
-        const sectionText = [];
-        while ((match = regex.exec(content)) !== null) {
-            let text = match[1].replace(/<[^>]+>/g, '');
-            // XML 엔티티 디코딩
-            text = text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-            sectionText.push(text);
+        const paragraphRegex = /<hp:p[^>]*>([\s\S]*?)<\/hp:p>/g;
+        let pMatch;
+        const sectionParagraphs = [];
+
+        while ((pMatch = paragraphRegex.exec(content)) !== null) {
+            const pContent = pMatch[1];
+            const textRegex = /<hp:t.*?>(.*?)<\/hp:t>/g;
+            let tMatch;
+            const textRuns = [];
+            while ((tMatch = textRegex.exec(pContent)) !== null) {
+                let text = tMatch[1].replace(/<[^>]+>/g, '');
+                // XML 엔티티 디코딩
+                text = text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+                textRuns.push(text);
+            }
+            if (textRuns.length > 0) {
+                sectionParagraphs.push(textRuns.join(''));
+            }
         }
-        if (sectionText.length > 0) {
-            textBlocks.push(sectionText.join(' '));
+
+        if (sectionParagraphs.length > 0) {
+            textBlocks.push(sectionParagraphs.join('\n'));
         }
     }
     
