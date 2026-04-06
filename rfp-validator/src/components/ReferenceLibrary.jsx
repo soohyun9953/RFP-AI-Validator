@@ -1,11 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, ExternalLink, FileText, Info, Search, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, Trash2, ExternalLink, FileText, Info, Search, AlertCircle, Upload, Loader2, X as CloseIcon } from 'lucide-react';
+import { processFile, ALL_ACCEPT, getFileExtension } from '../utils/fileExtractor';
 
 const ReferenceLibrary = () => {
     const [docs, setDocs] = useState([]);
     const [isAdding, setIsAdding] = useState(false);
     const [newDoc, setNewDoc] = useState({ title: '', content: '', type: 'text' });
     const [searchTerm, setSearchTerm] = useState('');
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [uploadError, setUploadError] = useState(null);
+    const fileInputRef = useRef(null);
 
     useEffect(() => {
         const savedDocs = localStorage.getItem('rfp_reference_docs');
@@ -30,6 +34,29 @@ const ReferenceLibrary = () => {
         saveDocs(updatedDocs);
         setNewDoc({ title: '', content: '', type: 'text' });
         setIsAdding(false);
+        setUploadError(null);
+    };
+
+    const handleFileChange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setIsProcessing(true);
+        setUploadError(null);
+        try {
+            const text = await processFile(file);
+            setNewDoc({
+                title: file.name.replace(/\.[^/.]+$/, ""), // 확장자 제거
+                content: text,
+                type: 'text'
+            });
+        } catch (err) {
+            console.error(err);
+            setUploadError(err.message || '파일 처리에 실패했습니다.');
+        } finally {
+            setIsProcessing(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
     };
 
     const handleDelete = (id) => {
@@ -64,6 +91,38 @@ const ReferenceLibrary = () => {
 
             {isAdding && (
                 <div className="glass-panel animate-fade-in" style={{ marginBottom: '24px', padding: '24px', border: '1px solid var(--panel-border)', borderRadius: '12px', background: 'rgba(255,255,255,0.03)' }}>
+                    
+                    <div style={{ marginBottom: '24px', padding: '20px', border: '2px dashed var(--panel-border)', borderRadius: '12px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', cursor: 'pointer', transition: 'all 0.2s' }}
+                         onClick={() => fileInputRef.current?.click()}>
+                        <input 
+                            type="file" 
+                            ref={fileInputRef}
+                            style={{ display: 'none' }}
+                            accept={ALL_ACCEPT}
+                            onChange={handleFileChange}
+                        />
+                        {isProcessing ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                                <Loader2 className="animate-spin" size={32} color="var(--accent-color)" />
+                                <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-primary)' }}>문서에서 텍스트를 추출하고 있습니다...</p>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                                <Upload size={32} color="var(--text-secondary)" />
+                                <div>
+                                    <p style={{ margin: '0 0 4px', fontSize: '14px', color: 'var(--text-primary)', fontWeight: 600 }}>보유하신 문서를 업로드해 보세요</p>
+                                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)' }}>PDF, Excel, PPTX, HWPX, TXT 등을 지원합니다.</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {uploadError && (
+                        <div style={{ marginBottom: '16px', padding: '12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', color: '#f87171', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <AlertCircle size={16} /> {uploadError}
+                        </div>
+                    )}
+
                     <form onSubmit={handleAdd}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                             <div>
