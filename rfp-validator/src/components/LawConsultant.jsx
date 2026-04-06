@@ -31,8 +31,19 @@ const renderMessageWithLawHighlight = (text) => {
                 title={isClickable ? `${part} 국가법령정보센터에서 법령표 검색` : '해당 법령 내 조항 번호'}
                 onClick={() => {
                     if (isClickable) {
-                        // ais/main.do 대신 /법령/ 경로를 사용하여 법령 본문으로 바로 이동하도록 개선
-                        window.open(`https://www.law.go.kr/법령/${cleanQuery}`, '_blank');
+                        const rawName = part.replace(/[「」]/g, '').trim();
+                        // 국가법령정보센터의 직접 링크(Friendly URL)는 공백이 없어야 정확히 이동함
+                        const cleanNameForLink = rawName.replace(/\s/g, '');
+                        let path = '법령';
+                        
+                        // 지침, 고시, 훈령, 예규 등은 행정규칙으로 분류
+                        if (rawName.endsWith('지침') || rawName.endsWith('고시') || rawName.endsWith('훈령') || rawName.endsWith('예규') || rawName.endsWith('규정')) {
+                            path = '행정규칙';
+                        } else if (rawName.endsWith('조례')) {
+                            path = '조례';
+                        }
+                        
+                        window.open(`https://www.law.go.kr/${path}/${encodeURIComponent(cleanNameForLink)}`, '_blank');
                     }
                 }}
                 onMouseOver={(e) => { 
