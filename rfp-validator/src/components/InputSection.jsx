@@ -478,8 +478,8 @@ function FileUploadArea({ label, icon: Icon, fileName, onFileSelect, onFileClear
 }
 
 // ── 메인 InputSection ──────────────────────────────────────
-export default function InputSection({ onAnalyze, isAnalyzing }) {
-    const [activeTab, setActiveTab] = useState(0);
+export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = false, onReset }) {
+    const [activeTab, setActiveTab] = useState(isTypoMode ? 1 : 0);
     const [guideline, setGuideline] = useState('');
     const [artifact, setArtifact] = useState('');
     const [inspectionScope, setInspectionScope] = useState('');
@@ -519,6 +519,22 @@ export default function InputSection({ onAnalyze, isAnalyzing }) {
         if (error) setGlossary('');
     };
 
+    const handleReset = () => {
+        if (window.confirm('입력된 모든 데이터(파일 및 텍스트)를 초기화하시겠습니까?')) {
+            setGuideline('');
+            setArtifact('');
+            setInspectionScope('');
+            setGlossary('');
+            setGuidelineFile('');
+            setArtifactFile('');
+            setGlossaryFile('');
+            setGuidelineError(null);
+            setArtifactError(null);
+            setGlossaryError(null);
+            if (onReset) onReset();
+        }
+    };
+
     return (
         <div className="glass-panel animate-fade-in" style={{
             flex: 1, display: 'flex', flexDirection: 'column',
@@ -531,6 +547,29 @@ export default function InputSection({ onAnalyze, isAnalyzing }) {
             }}>
                 <FileText size={20} color="var(--accent-color)" />
                 <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>데이터 입력</h2>
+                <button
+                    onClick={handleReset}
+                    title="전체 입력 초기화"
+                    style={{
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.2)',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        color: 'var(--danger-color)',
+                        cursor: 'pointer',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        marginLeft: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
+                >
+                    <X size={12} /> 입력 초기화
+                </button>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
                     <span style={{
                         fontSize: '10px', padding: '3px 6px',
@@ -562,12 +601,16 @@ export default function InputSection({ onAnalyze, isAnalyzing }) {
 
             {/* 탭 헤더 */}
             <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--panel-border)', paddingBottom: '8px', marginBottom: '8px' }}>
-                {[
+                {(isTypoMode ? [
+                    { id: 1, label: '1. 검증 대상 문서', icon: FileText, hasData: !!artifact || !!artifactFile },
+                    { id: 2, label: '2. 용어 사전', icon: FileSpreadsheet, hasData: !!glossary || !!glossaryFile },
+                    { id: 3, label: '3. 점검 범위', icon: ClipboardList, hasData: !!inspectionScope }
+                ] : [
                     { id: 0, label: '1. 기준 문서', icon: Target, hasData: !!guideline || !!guidelineFile },
                     { id: 1, label: '2. 산출물', icon: FileText, hasData: !!artifact || !!artifactFile },
                     { id: 2, label: '3. 용어 사전', icon: FileSpreadsheet, hasData: !!glossary || !!glossaryFile },
                     { id: 3, label: '4. 점검 범위', icon: ClipboardList, hasData: !!inspectionScope }
-                ].map(tab => (
+                ]).map(tab => (
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
@@ -591,7 +634,7 @@ export default function InputSection({ onAnalyze, isAnalyzing }) {
 
             {/* 탭 컨텐츠 */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                {activeTab === 0 && (
+                {activeTab === 0 && !isTypoMode && (
                     <FileUploadArea
                         label="비교/검증의 잣대가 될 기준 문서 (RFP, 분석서 등)"
                         icon={Target}
@@ -654,24 +697,24 @@ export default function InputSection({ onAnalyze, isAnalyzing }) {
             <button
                 className="primary"
                 onClick={() => onAnalyze(guideline, artifact, inspectionScope, glossary)}
-                disabled={isAnalyzing || guidelineLoading || artifactLoading || glossaryLoading || (!guideline && !artifact && !glossary)}
+                disabled={isAnalyzing || guidelineLoading || artifactLoading || glossaryLoading || ((!isTypoMode && !guideline && !artifact && !glossary) || (isTypoMode && !artifact))}
                 style={{
                     marginTop: '8px',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     gap: '8px', padding: '16px', fontSize: '16px',
-                    opacity: (isAnalyzing || guidelineLoading || artifactLoading || glossaryLoading || (!guideline && !artifact && !glossary)) ? 0.6 : 1,
-                    cursor: (isAnalyzing || guidelineLoading || artifactLoading || glossaryLoading || (!guideline && !artifact && !glossary)) ? 'not-allowed' : 'pointer',
+                    opacity: (isAnalyzing || guidelineLoading || artifactLoading || glossaryLoading || ((!isTypoMode && !guideline && !artifact && !glossary) || (isTypoMode && !artifact))) ? 0.6 : 1,
+                    cursor: (isAnalyzing || guidelineLoading || artifactLoading || glossaryLoading || ((!isTypoMode && !guideline && !artifact && !glossary) || (isTypoMode && !artifact))) ? 'not-allowed' : 'pointer',
                 }}
             >
                 {isAnalyzing ? (
                     <>
                         <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
-                        AI 검증 진행 중...
+                        {isTypoMode ? 'AI 교정/교열 진행 중...' : 'AI 검증 진행 중...'}
                     </>
                 ) : (
                     <>
                         <Play size={20} />
-                        엄격한 검증 시작 (4단계 추론)
+                        {isTypoMode ? '문서 품질 정밀 점검 시작' : '엄격한 검증 시작 (4단계 추론)'}
                     </>
                 )}
             </button>

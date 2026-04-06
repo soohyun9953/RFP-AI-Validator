@@ -3,7 +3,7 @@ import { ShieldAlert, CheckCircle2, XCircle, FileWarning, AlertTriangle, Clipboa
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 /** 매핑 결과를 엑셀 파일로 내보내기 */
-async function exportToExcel(data) {
+async function exportToExcel(data, isTypoMode = false) {
     const wb = new ExcelJS.Workbook();
     
     // helper 
@@ -39,73 +39,75 @@ async function exportToExcel(data) {
         });
     };
 
-    // ── 시트1: 요구사항 매핑 현황 (RTM) ──
-    const rtmHeaders = [
-        { header: '번호', key: '번호', width: 6 },
-        { header: '분류', key: '분류', width: 8 },
-        { header: '기준 문서 요건', key: '기준문서요건', width: 50 },
-        { header: '카테고리', key: '카테고리', width: 15 },
-        { header: '수준', key: '수준', width: 10 },
-        { header: '상태', key: '상태', width: 12 },
-        { header: '산출물 증빙 위치', key: '산출물증빙위치', width: 40 }
-    ];
-    const rtmRows = (data.rtm || []).map((item, idx) => ({
-        '번호': idx + 1,
-        '분류': item.type || '필수',
-        '기준문서요건': item.requirement || '',
-        '카테고리': item.category || '',
-        '수준': item.levelLabel || '',
-        '상태': item.status || '',
-        '산출물증빙위치': item.location || '',
-    }));
-    addSheet('매핑현황(RTM)', rtmHeaders, rtmRows);
-
-    // ── 시트2: 매핑 상세 ──
-    const detailHeaders = [
-        { header: '번호', key: '번호', width: 6 },
-        { header: 'ID', key: 'ID', width: 12 },
-        { header: '분류', key: '분류', width: 8 },
-        { header: '카테고리', key: '카테고리', width: 15 },
-        { header: '수준', key: '수준', width: 10 },
-        { header: '계층 경로', key: '계층경로', width: 40 },
-        { header: '요구사항', key: '요구사항', width: 50 },
-        { header: '산출물 대응 섹션', key: '산출물대응섹션', width: 30 },
-        { header: '산출물 기술 내용', key: '산출물기술내용', width: 40 },
-        { header: '상태', key: '상태', width: 12 },
-        { header: '차이점', key: '차이점', width: 50 }
-    ];
-    const detailRows = (data.requirementMapping || []).map((item, idx) => ({
-        '번호': idx + 1,
-        'ID': item.id || '',
-        '분류': item.type || '필수',
-        '카테고리': item.category || '',
-        '수준': item.levelLabel || '',
-        '계층경로': item.path || '',
-        '요구사항': item.requirement || '',
-        '산출물대응섹션': item.artifactSection || '',
-        '산출물기술내용': (item.artifactContent || '').replace(/^"|"$/g, ''),
-        '상태': item.status || '',
-        '차이점': item.gap || '',
-    }));
-    addSheet('매핑상세', detailHeaders, detailRows);
-
-    // ── 시트3: 누락 사항 ──
-    if (data.omissions && data.omissions.length > 0) {
-        const omiHeaders = [
+    if (!isTypoMode) {
+        // ── 시트1: 요구사항 매핑 현황 (RTM) ──
+        const rtmHeaders = [
             { header: '번호', key: '번호', width: 6 },
-            { header: '항목', key: '항목', width: 30 },
-            { header: '근거', key: '근거', width: 50 },
-            { header: '사유', key: '사유', width: 50 },
-            { header: '권고사항', key: '권고사항', width: 50 }
+            { header: '분류', key: '분류', width: 8 },
+            { header: '기준 문서 요건', key: '기준문서요건', width: 50 },
+            { header: '카테고리', key: '카테고리', width: 15 },
+            { header: '수준', key: '수준', width: 10 },
+            { header: '상태', key: '상태', width: 12 },
+            { header: '산출물 증빙 위치', key: '산출물증빙위치', width: 40 }
         ];
-        const omiRows = data.omissions.map((item, idx) => ({
+        const rtmRows = (data.rtm || []).map((item, idx) => ({
             '번호': idx + 1,
-            '항목': item.title || '',
-            '근거': item.evidence || '',
-            '사유': item.reason || '',
-            '권고사항': item.recommendation || '',
+            '분류': item.type || '필수',
+            '기준문서요건': item.requirement || '',
+            '카테고리': item.category || '',
+            '수준': item.levelLabel || '',
+            '상태': item.status || '',
+            '산출물증빙위치': item.location || '',
         }));
-        addSheet('누락사항', omiHeaders, omiRows);
+        addSheet('매핑현황(RTM)', rtmHeaders, rtmRows);
+
+        // ── 시트2: 매핑 상세 ──
+        const detailHeaders = [
+            { header: '번호', key: '번호', width: 6 },
+            { header: 'ID', key: 'ID', width: 12 },
+            { header: '분류', key: '분류', width: 8 },
+            { header: '카테고리', key: '카테고리', width: 15 },
+            { header: '수준', key: '수준', width: 10 },
+            { header: '계층 경로', key: '계층경로', width: 40 },
+            { header: '요구사항', key: '요구사항', width: 50 },
+            { header: '산출물 대응 섹션', key: '산출물대응섹션', width: 30 },
+            { header: '산출물 기술 내용', key: '산출물기술내용', width: 40 },
+            { header: '상태', key: '상태', width: 12 },
+            { header: '차이점', key: '차이점', width: 50 }
+        ];
+        const detailRows = (data.requirementMapping || []).map((item, idx) => ({
+            '번호': idx + 1,
+            'ID': item.id || '',
+            '분류': item.type || '필수',
+            '카테고리': item.category || '',
+            '수준': item.levelLabel || '',
+            '계층경로': item.path || '',
+            '요구사항': item.requirement || '',
+            '산출물대응섹션': item.artifactSection || '',
+            '산출물기술내용': (item.artifactContent || '').replace(/^"|"$/g, ''),
+            '상태': item.status || '',
+            '차이점': item.gap || '',
+        }));
+        addSheet('매핑상세', detailHeaders, detailRows);
+
+        // ── 시트3: 누락 사항 ──
+        if (data.omissions && data.omissions.length > 0) {
+            const omiHeaders = [
+                { header: '번호', key: '번호', width: 6 },
+                { header: '항목', key: '항목', width: 30 },
+                { header: '근거', key: '근거', width: 50 },
+                { header: '사유', key: '사유', width: 50 },
+                { header: '권고사항', key: '권고사항', width: 50 }
+            ];
+            const omiRows = data.omissions.map((item, idx) => ({
+                '번호': idx + 1,
+                '항목': item.title || '',
+                '근거': item.evidence || '',
+                '사유': item.reason || '',
+                '권고사항': item.recommendation || '',
+            }));
+            addSheet('누락사항', omiHeaders, omiRows);
+        }
     }
 
     // ── 시트4: 문서 품질(오탈자 등) 점검 ──
@@ -129,7 +131,7 @@ async function exportToExcel(data) {
 
     const now = new Date();
     const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
-    const fileName = `기준문서_검증결과_${dateStr}.xlsx`;
+    const fileName = isTypoMode ? `교정교열_결과_${dateStr}.xlsx` : `기준문서_검증결과_${dateStr}.xlsx`;
 
     try {
         const buffer = await wb.xlsx.writeBuffer();
@@ -158,7 +160,7 @@ async function exportToExcel(data) {
     }
 }
 
-export default function ResultDashboard({ data }) {
+export default function ResultDashboard({ data, isTypoMode = false }) {
     if (!data) return null;
 
     return (
@@ -190,7 +192,7 @@ export default function ResultDashboard({ data }) {
                         <ShieldAlert size={20} color="var(--warning-color)" />
                         <h3 style={{ margin: 0, fontSize: '18px', flex: 1 }}>종합 평가 보고서</h3>
                         <button
-                            onClick={() => exportToExcel(data)}
+                            onClick={() => exportToExcel(data, isTypoMode)}
                             style={{
                                 display: 'flex', alignItems: 'center', gap: '6px',
                                 padding: '8px 16px', fontSize: '13px', fontWeight: 600,
