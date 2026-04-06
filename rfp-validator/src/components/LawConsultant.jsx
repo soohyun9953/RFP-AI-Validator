@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Scale, User, Bot, Loader2, Sparkles, X } from 'lucide-react';
+import { Send, Scale, User, Bot, Loader2, Sparkles, X, Copy, Check } from 'lucide-react';
 import { askLawAssistant, askGeneralLawAssistant } from '../lawAnalyzer';
 
 const renderMessageWithLawHighlight = (text) => {
@@ -64,7 +64,15 @@ function LawConsultant({ apiKey, isMcpMode = true }) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [mcpQueryStatus, setMcpQueryStatus] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
   const messagesEndRef = useRef(null);
+
+  const handleCopy = (text, id) => {
+    navigator.clipboard.writeText(text).then(() => {
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -169,9 +177,36 @@ function LawConsultant({ apiKey, isMcpMode = true }) {
                 background: msg.role === 'user' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(0, 0, 0, 0.2)',
                 border: `1px solid ${msg.role === 'user' ? 'rgba(59, 130, 246, 0.3)' : 'var(--panel-border)'}`,
                 padding: '16px', borderRadius: '12px', maxWidth: '80%', lineHeight: '1.6', fontSize: '14px', color: 'var(--text-secondary)',
-                whiteSpace: 'pre-wrap'
+                whiteSpace: 'pre-wrap', position: 'relative', group: 'true'
             }}>
                 {msg.role === 'model' ? renderMessageWithLawHighlight(msg.text) : msg.text}
+                
+                {msg.role === 'model' && (
+                  <button
+                    onClick={() => handleCopy(msg.text, idx)}
+                    style={{
+                      position: 'absolute',
+                      top: '8px',
+                      right: '8px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid var(--panel-border)',
+                      borderRadius: '4px',
+                      padding: '4px',
+                      cursor: 'pointer',
+                      color: copiedId === idx ? 'var(--success-color)' : 'var(--text-secondary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s',
+                      opacity: 0.6
+                    }}
+                    title="답변 복사"
+                    onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                    onMouseLeave={e => e.currentTarget.style.opacity = 0.6}
+                  >
+                    {copiedId === idx ? <Check size={14} /> : <Copy size={14} />}
+                  </button>
+                )}
             </div>
           </div>
         ))}
