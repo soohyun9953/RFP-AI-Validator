@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './index.css';
-import { ShieldCheck, Key, HelpCircle, X, BookOpen, Fingerprint, PenTool, Scale } from 'lucide-react';
+import ReferenceLibrary from './components/ReferenceLibrary';
+import { ShieldCheck, Key, HelpCircle, X, BookOpen, Fingerprint, PenTool, Scale, Library, Info, Clock, Trash2, ArrowUpRight } from 'lucide-react';
 import { Analytics } from "@vercel/analytics/react";
 import Sidebar from './components/Sidebar';
 import DocumentValidator from './components/DocumentValidator';
@@ -11,6 +12,18 @@ function App() {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
   const [activeMenu, setActiveMenu] = useState('validator'); // 'validator' or 'law'
   const [isManualOpen, setIsManualOpen] = useState(false);
+  const [refModal, setRefModal] = useState({ open: false, title: '', content: '' });
+
+  // 법률 및 가이드 클릭 시 사용자 등록 문서 검색을 위한 통합 핸들러
+  useEffect(() => {
+    // LawConsultant 내부에서 발생하는 이벤트를 가로채거나 
+    // 전역 window 이벤트를 통해 LawConsultant가 모달을 요청할 수 있게 함
+    const handleOpenRef = (e) => {
+        setRefModal({ open: true, title: e.detail.title, content: e.detail.content });
+    };
+    window.addEventListener('open_reference_modal', handleOpenRef);
+    return () => window.removeEventListener('open_reference_modal', handleOpenRef);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('gemini_api_key', apiKey);
@@ -79,6 +92,9 @@ function App() {
           <div style={{ display: activeMenu === 'law_general' ? 'block' : 'none', height: '100%' }}>
             <LawConsultant apiKey={apiKey} isMcpMode={false} />
           </div>
+          <div style={{ display: activeMenu === 'reference' ? 'block' : 'none', height: '100%' }}>
+            <ReferenceLibrary />
+          </div>
         </main>
 
         {isManualOpen && (
@@ -111,6 +127,17 @@ function App() {
                           </div>
                       </div>
 
+                      <div style={{ background: 'rgba(59, 130, 246, 0.05)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.2)', marginTop: '20px' }}>
+                          <h4 style={{ color: 'var(--accent-color)', margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: '8px' }}><Library size={20} /> 5. 참고 자료/가이드 관리 (사용자 등록)</h4>
+                          <p style={{ margin: 0, fontSize: '13.5px', color: 'var(--text-primary)', fontWeight: 500 }}>
+                              법령정보센터에 없는 <strong>특수 가이드, 사업 매뉴얼, 지침서</strong> 등을 직접 등록하세요.
+                          </p>
+                          <ul style={{ paddingLeft: '20px', marginTop: '10px', fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <li>등록된 문서의 제목이 AI 답변 중에 나오면 링크 클릭 시 사용자가 등록한 <strong>내용을 우선적</strong>으로 보여줍니다.</li>
+                              <li>PDF 링크(URL)나 텍스트 본문(팝업) 중 선택하여 등록할 수 있습니다.</li>
+                          </ul>
+                      </div>
+
                       <h3 style={{ color: 'var(--text-primary)', marginTop: '32px', fontSize: '16px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>🔍 공통 필수 사항 (API 키)</h3>
                       <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
                           <li>
@@ -118,6 +145,25 @@ function App() {
                               <span style={{ fontSize: '13px', color: 'var(--accent-color)' }}>※ API 키는 <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-color)', textDecoration: 'underline' }}>구글 AI 스튜디오</a>에서 무료로 발급받을 수 있습니다.</span>
                           </li>
                       </ul>
+                  </div>
+              </div>
+          </div>
+        )}
+        {/* 참고 문서 내용 표시용 통합 모달 */}
+        {refModal.open && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
+              <div className="glass-panel animate-fade-in" style={{ width: '700px', maxWidth: '90%', maxHeight: '80vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-secondary)', border: '1px solid var(--panel-border)', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8)' }}>
+                  <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--panel-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(to right, rgba(59, 130, 246, 0.1), transparent)' }}>
+                      <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <FileText size={20} color="var(--accent-color)" /> {refModal.title}
+                      </h3>
+                      <button onClick={() => setRefModal({ ...refModal, open: false })} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%' }}><X size={18} /></button>
+                  </div>
+                  <div style={{ padding: '32px', overflowY: 'auto', flex: 1, color: 'var(--text-primary)', lineHeight: '1.7', fontSize: '15px', whiteSpace: 'pre-wrap' }}>
+                      {refModal.content}
+                  </div>
+                  <div style={{ padding: '16px 24px', borderTop: '1px solid var(--panel-border)', display: 'flex', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.1)' }}>
+                      <button onClick={() => setRefModal({ ...refModal, open: false })} style={{ background: 'var(--accent-color)', color: 'white', border: 'none', padding: '8px 24px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>닫기</button>
                   </div>
               </div>
           </div>

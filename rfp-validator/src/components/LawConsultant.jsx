@@ -5,11 +5,11 @@ import { askLawAssistant, askGeneralLawAssistant } from '../lawAnalyzer';
 const renderMessageWithLawHighlight = (text) => {
     if (!text) return null;
     // 「법령명」 또는 제O조(의O) 제O항 패턴, 그리고 「」없이 나오는 한글 법령명도 폴백으로 인식
-    const regex = /(「[^」]+」|[가-힣]{2,10}(?:기본법|진흥법|보호법|계약법|촉진법|이용법|관리법|처리법|지원법|특별법|처벌법|에관한법률|에관한특별법|하도급법|조례|훈령|규칙|지침|고시|예규)|제\d+조(?:의\d+)?(?:\s?제\d+항)?(?:의\d+)?)/g;
+    const regex = /(「[^」]+」|[가-힣]{2,20}(?:기본법|진흥법|보호법|계약법|촉진법|이용법|관리법|처리법|지원법|특별법|처벌법|에관한법률|에관한특별법|하도급법|조례|훈령|규칙|지침|고시|예규|가이드|매뉴얼|안내서|지침서)|제\d+조(?:의\d+)?(?:\s?제\d+항)?(?:의\d+)?)/g;
     const parts = text.split(regex);
     
     return parts.map((part, i) => {
-        const isLawName = part.match(/^「[^」]+」$/) || part.match(/^[가-힣]{2,10}(?:기본법|진흥법|보호법|계약법|촉진법|이용법|관리법|처리법|지원법|특별법|처벌법|에관한법률|에관한특별법|하도급법|조례|훈령|규칙|지침|고시|예규)$/);
+        const isLawName = part.match(/^「[^」]+」$/) || part.match(/^[가-힣]{2,20}(?:기본법|진흥법|보호법|계약법|촉진법|이용법|관리법|처리법|지원법|특별법|처벌법|에관한법률|에관한특별법|하도급법|조례|훈령|규칙|지침|고시|예규|가이드|매뉴얼|안내서|지침서)$/);
         const isClause = part.match(/^제\d+조(?:의\d+)?(?:\s?제\d+항)?(?:의\d+)?$/);
 
         if (isLawName || isClause) {
@@ -32,17 +32,35 @@ const renderMessageWithLawHighlight = (text) => {
                 onClick={() => {
                     if (isClickable) {
                         const rawName = part.replace(/[「」]/g, '').trim();
-                        // 가이드, 매뉴얼, 안내서 등은 법제처 법령정보가 아닌 부처 가이드라인이므로 구글 검색으로 연결
+                        // 1. 사용자 등록 문서 선행 확인 (localStorage)
+                        const savedDocs = JSON.parse(localStorage.getItem('rfp_reference_docs') || '[]');
+                        const cleanName = rawName.replace(/\s/g, '').toLowerCase();
+                        const matchedDoc = savedDocs.find(d => 
+                            d.title.replace(/\s/g, '').toLowerCase() === cleanName
+                        );
+
+                        if (matchedDoc) {
+                            if (matchedDoc.type === 'link') {
+                                window.open(matchedDoc.content, '_blank');
+                            } else {
+                                // App.jsx에 등록된 커스텀 이벤트를 발생시켜 모달을 띄움
+                                window.dispatchEvent(new CustomEvent('open_reference_modal', { 
+                                    detail: { title: matchedDoc.title, content: matchedDoc.content } 
+                                }));
+                            }
+                            return;
+                        }
+
+                        // 2. 가이드라인 등 비법령 문서 확인 -> 구글 검색
                         if (rawName.includes('가이드') || rawName.includes('매뉴얼') || rawName.includes('안내서') || rawName.includes('지침서')) {
                             window.open(`https://www.google.com/search?q=${encodeURIComponent(rawName)}`, '_blank');
                             return;
                         }
 
-                        // 국가법령정보센터의 직접 링크(Friendly URL)는 공백이 없어야 정확히 이동함
+                        // 3. 국가법령정보센터 직접 링크 (Friendly URL)
                         const cleanNameForLink = rawName.replace(/\s/g, '');
                         let path = '법령';
                         
-                        // 지침, 고시, 훈령, 예규 등은 행정규칙으로 분류
                         if (rawName.endsWith('지침') || rawName.endsWith('고시') || rawName.endsWith('훈령') || rawName.endsWith('예규') || rawName.endsWith('규정')) {
                             path = '행정규칙';
                         } else if (rawName.endsWith('조례')) {
