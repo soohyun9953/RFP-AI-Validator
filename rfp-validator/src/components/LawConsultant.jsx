@@ -32,6 +32,12 @@ const renderMessageWithLawHighlight = (text) => {
                 onClick={() => {
                     if (isClickable) {
                         const rawName = part.replace(/[「」]/g, '').trim();
+                        // 가이드, 매뉴얼, 안내서 등은 법제처 법령정보가 아닌 부처 가이드라인이므로 구글 검색으로 연결
+                        if (rawName.includes('가이드') || rawName.includes('매뉴얼') || rawName.includes('안내서') || rawName.includes('지침서')) {
+                            window.open(`https://www.google.com/search?q=${encodeURIComponent(rawName)}`, '_blank');
+                            return;
+                        }
+
                         // 국가법령정보센터의 직접 링크(Friendly URL)는 공백이 없어야 정확히 이동함
                         const cleanNameForLink = rawName.replace(/\s/g, '');
                         let path = '법령';
