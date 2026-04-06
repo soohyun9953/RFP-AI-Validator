@@ -102,12 +102,12 @@ function App() {
                               <p style={{ margin: 0, fontSize: '13px' }}>전문 <strong>교정교열</strong> 엔진이 문맥상의 오류, 비문, 오탈자뿐만 아니라 공공기관 특유의 '개조식 문체' 적합성까지 한 번에 점검합니다.</p>
                           </div>
                           <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '10px', border: '1px solid var(--panel-border)' }}>
-                              <h4 style={{ color: 'var(--accent-color)', margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: '6px' }}><Fingerprint size={18} /> 3. AI 법률 자문 (MCP)</h4>
-                              <p style={{ margin: 0, fontSize: '13px' }}><strong>국가계약법, 소진법</strong> 등 실시간 법령 정보를 직접 조회하여 답변합니다. PM 업무 중 발생하는 법적 쟁점에 대해 가장 정확한 근거를 제공합니다.</p>
+                              <h4 style={{ color: 'var(--success-color)', margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: '6px' }}><Scale size={18} /> 3. AI 법률 자문 (Gemini)</h4>
+                              <p style={{ margin: 0, fontSize: '13px' }}>Gemini의 방대한 내부 지식을 사용하여 <strong>빠르고 가볍게</strong> 규정을 검토합니다. 일상적인 가이드라인이나 일반적인 지식 검색에 최적화되어 있습니다.</p>
                           </div>
                           <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '10px', border: '1px solid var(--panel-border)' }}>
-                              <h4 style={{ color: 'var(--success-color)', margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: '6px' }}><Scale size={18} /> 4. AI 법률 자문 (Gemini)</h4>
-                              <p style={{ margin: 0, fontSize: '13px' }}>Gemini의 방대한 내부 지식을 사용하여 <strong>빠르고 가볍게</strong> 규정을 검토합니다. 일상적인 가이드라인이나 일반적인 지식 검색에 최적화되어 있습니다.</p>
+                              <h4 style={{ color: 'var(--accent-color)', margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: '6px' }}><Fingerprint size={18} /> 4. AI 법률 자문 (MCP)</h4>
+                              <p style={{ margin: 0, fontSize: '13px' }}><strong>국가계약법, 소진법</strong> 등 실시간 법령 정보를 직접 조회하여 답변합니다. PM 업무 중 발생하는 법적 쟁점에 대해 가장 정확한 근거를 제공합니다.</p>
                           </div>
                       </div>
 
