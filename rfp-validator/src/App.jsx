@@ -88,30 +88,37 @@ function App() {
                      <h2 style={{ margin: 0, fontSize: '18px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}><HelpCircle size={20} color="var(--accent-color)" /> PM Dashboard 간단 사용 방법</h2>
                      <button onClick={() => setIsManualOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={20} /></button>
                  </div>
-                 <div style={{ padding: '24px 32px', overflowY: 'auto', flex: 1, color: 'var(--text-secondary)', lineHeight: '1.6', fontSize: '14px' }}>
-                     <h3 style={{ color: 'var(--text-primary)', marginTop: 0, fontSize: '16px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>📌 개요</h3>
-                     <p>본 시스템은 공공 및 기업의 IT 프로젝트 PM을 위한 통합 대시보드입니다. 산출물 검증과 규정 검토를 한 곳에서 처리할 수 있습니다.</p>
-                     
-                     <h3 style={{ color: 'var(--text-primary)', marginTop: '24px', fontSize: '16px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>📝 기능 1: AI 문서 검증</h3>
-                     <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                         <li><strong>기준 문서 vs 대상 산출물:</strong> 우측 탭에서 문서 검증 메뉴를 클릭하고 기준 문서와 검증할 산출물을 올립니다.</li>
-                         <li><strong>추적 행렬(RTM) 자동 생성:</strong> 기준 대비 누락되거나 맞춤법 틀린 부분을 AI가 10~20초 안에 찾아내어 보고합니다.</li>
-                     </ul>
+                  <div style={{ padding: '24px 32px', overflowY: 'auto', flex: 1, color: 'var(--text-secondary)', lineHeight: '1.6', fontSize: '14px' }}>
+                      <h3 style={{ color: 'var(--text-primary)', marginTop: 0, fontSize: '16px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>📌 PM Dashboard 4대 핵심 기능</h3>
+                      <p>본 시스템은 IT 프로젝트 PM의 업무 효율을 극대화하기 위해 설계된 통합 관리 도구입니다.</p>
+                      
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '20px' }}>
+                          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '10px', border: '1px solid var(--panel-border)' }}>
+                              <h4 style={{ color: 'var(--success-color)', margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: '6px' }}><ShieldCheck size={18} /> 1. AI 제안/산출물 검증</h4>
+                              <p style={{ margin: 0, fontSize: '13px' }}><strong>기준 문서(RFP)</strong>와 <strong>산출물</strong>을 비교하여 요구사항 누락 여부와 정합성을 문장 단위로 정밀 분석합니다. RTM(추적행렬)이 자동 생성됩니다.</p>
+                          </div>
+                          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '10px', border: '1px solid var(--panel-border)' }}>
+                              <h4 style={{ color: 'var(--warning-color)', margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: '6px' }}><PenTool size={18} /> 2. AI 품질/오탈자 점검</h4>
+                              <p style={{ margin: 0, fontSize: '13px' }}>전문 <strong>교정교열</strong> 엔진이 문맥상의 오류, 비문, 오탈자뿐만 아니라 공공기관 특유의 '개조식 문체' 적합성까지 한 번에 점검합니다.</p>
+                          </div>
+                          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '10px', border: '1px solid var(--panel-border)' }}>
+                              <h4 style={{ color: 'var(--accent-color)', margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: '6px' }}><Fingerprint size={18} /> 3. AI 법률 자문 (MCP)</h4>
+                              <p style={{ margin: 0, fontSize: '13px' }}><strong>국가계약법, 소진법</strong> 등 실시간 법령 정보를 직접 조회하여 답변합니다. PM 업무 중 발생하는 법적 쟁점에 대해 가장 정확한 근거를 제공합니다.</p>
+                          </div>
+                          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '10px', border: '1px solid var(--panel-border)' }}>
+                              <h4 style={{ color: 'var(--success-color)', margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: '6px' }}><Scale size={18} /> 4. AI 법률 자문 (Gemini)</h4>
+                              <p style={{ margin: 0, fontSize: '13px' }}>Gemini의 방대한 내부 지식을 사용하여 <strong>빠르고 가볍게</strong> 규정을 검토합니다. 일상적인 가이드라인이나 일반적인 지식 검색에 최적화되어 있습니다.</p>
+                          </div>
+                      </div>
 
-                     <h3 style={{ color: 'var(--text-primary)', marginTop: '24px', fontSize: '16px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>⚖️ 기능 2: AI 법률 자문 (신규)</h3>
-                     <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                         <li>좌측 메뉴에서 <strong>AI 법률 자문 (MCP)</strong> 탭을 클릭하여 챗봇을 호출합니다.</li>
-                         <li>PM 업무 중 헷갈리는 국가계약법, 하도급 제약, 소프트웨어 진흥법 조항을 일상어로 물어보면 관련된 법적 근거가 포함된 해설을 받을 수 있습니다.</li>
-                     </ul>
-
-                     <h3 style={{ color: 'var(--text-primary)', marginTop: '24px', fontSize: '16px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>🔍 공통 필수 사항 (API 키)</h3>
-                     <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                         <li>
-                             모든 AI 기능을 사용하려면 우측 상단 키 입력란에 <strong>Google Gemini API Key</strong>를 반드시 입력해야 합니다.<br/>
-                             <span style={{ fontSize: '13px', color: 'var(--accent-color)' }}>※ API 키는 <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-color)', textDecoration: 'underline' }}>구글 AI 스튜디오</a>에서 무료로 발급받을 수 있습니다.</span>
-                         </li>
-                     </ul>
-                 </div>
+                      <h3 style={{ color: 'var(--text-primary)', marginTop: '32px', fontSize: '16px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>🔍 공통 필수 사항 (API 키)</h3>
+                      <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+                          <li>
+                              모든 기능을 사용하려면 우측 상단 키 입력란에 <strong>Google Gemini API Key</strong>를 반드시 입력해야 합니다.<br/>
+                              <span style={{ fontSize: '13px', color: 'var(--accent-color)' }}>※ API 키는 <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-color)', textDecoration: 'underline' }}>구글 AI 스튜디오</a>에서 무료로 발급받을 수 있습니다.</span>
+                          </li>
+                      </ul>
+                  </div>
               </div>
           </div>
         )}

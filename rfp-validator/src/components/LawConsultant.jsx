@@ -31,7 +31,8 @@ const renderMessageWithLawHighlight = (text) => {
                 title={isClickable ? `${part} 국가법령정보센터에서 법령표 검색` : '해당 법령 내 조항 번호'}
                 onClick={() => {
                     if (isClickable) {
-                        window.open(`https://www.law.go.kr/LSW/ais/main.do?query=${cleanQuery}`, '_blank');
+                        // ais/main.do 대신 /법령/ 경로를 사용하여 법령 본문으로 바로 이동하도록 개선
+                        window.open(`https://www.law.go.kr/법령/${cleanQuery}`, '_blank');
                     }
                 }}
                 onMouseOver={(e) => { 
