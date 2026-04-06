@@ -45,11 +45,21 @@ const ReferenceLibrary = () => {
         setUploadError(null);
         try {
             const text = await processFile(file);
-            setNewDoc({
-                title: file.name.replace(/\.[^/.]+$/, ""), // 확장자 제거
+            const title = file.name.replace(/\.[^/.]+$/, "");
+            
+            const newEntry = {
+                id: Date.now(),
+                title: title,
                 content: text,
-                type: 'text'
-            });
+                type: 'text',
+                createdAt: new Date().toISOString()
+            };
+
+            const updatedDocs = [...docs, newEntry];
+            saveDocs(updatedDocs);
+            
+            setNewDoc({ title: '', content: '', type: 'text' });
+            setIsAdding(false);
         } catch (err) {
             console.error(err);
             setUploadError(err.message || '파일 처리에 실패했습니다.');
