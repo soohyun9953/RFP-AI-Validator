@@ -186,25 +186,37 @@ function LawConsultant({ apiKey, isMcpMode = true }) {
                     onClick={() => handleCopy(msg.text, idx)}
                     style={{
                       position: 'absolute',
-                      top: '8px',
+                      bottom: '8px',
                       right: '8px',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid var(--panel-border)',
-                      borderRadius: '4px',
-                      padding: '4px',
+                      background: 'rgba(255, 255, 255, 0.15)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '6px',
+                      padding: '4px 8px',
                       cursor: 'pointer',
-                      color: copiedId === idx ? 'var(--success-color)' : 'var(--text-secondary)',
+                      color: copiedId === idx ? 'var(--success-color)' : 'var(--text-primary)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
+                      gap: '4px',
                       transition: 'all 0.2s',
-                      opacity: 0.6
+                      opacity: 1,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                      zIndex: 10,
+                      fontSize: '11px',
+                      fontWeight: 600
                     }}
                     title="답변 복사"
-                    onMouseEnter={e => e.currentTarget.style.opacity = 1}
-                    onMouseLeave={e => e.currentTarget.style.opacity = 0.6}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
                   >
-                    {copiedId === idx ? <Check size={14} /> : <Copy size={14} />}
+                    {copiedId === idx ? <Check size={12} /> : <Copy size={12} />}
+                    {copiedId === idx ? '복사됨' : '복사'}
                   </button>
                 )}
             </div>
