@@ -1,77 +1,87 @@
 import React from 'react';
-import { ShieldCheck, Scale, FileText, Settings, LayoutDashboard, PenTool, Library } from 'lucide-react';
+import { ShieldCheck, Scale, FileText, Settings, LayoutDashboard, PenTool, Library, ChevronLeft, ChevronRight, Fingerprint } from 'lucide-react';
 
 function Sidebar({ activeMenu, setActiveMenu }) {
   const menuItems = [
-    { id: 'validator', label: 'AI 제안/산출물 검증', icon: <FileText size={20} /> },
+    { id: 'validator', label: 'AI 산출물 검증 (ISMP/RFP)', icon: <FileText size={20} /> },
     { id: 'typo', label: 'AI 문서 품질/오탈자 점검', icon: <PenTool size={20} /> },
     { id: 'law_general', label: 'AI 법률 자문 (Gemini)', icon: <Scale size={20} /> },
-    { id: 'law', label: 'AI 법률 자문 (MCP)', icon: <Scale size={20} /> },
+    { id: 'law', label: 'AI 법률 자문 (MCP)', icon: <Fingerprint size={20} /> },
     { id: 'reference', label: '참고 자료 관리', icon: <Library size={20} /> },
   ];
 
   return (
-    <aside className="animate-fade-in" style={{ width: '280px', flexShrink: 0, padding: '32px 20px', display: 'flex', flexDirection: 'column', gap: '8px', zIndex: 10, background: 'rgba(0,0,0,0.2)', borderRight: '1px solid var(--glass-border)', backdropFilter: 'blur(10px)' }}>
-      <div style={{ padding: '0 12px 40px' }}>
-        <h2 style={{ margin: 0, fontSize: '20px', display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--text-primary)', letterSpacing: '-0.5px', fontWeight: 700 }}>
-          <div style={{ background: 'var(--accent-blue)', borderRadius: '8px', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(59, 130, 246, 0.4)' }}>
-            <LayoutDashboard size={20} color="white" />
+    <aside className="animate-fade-in" style={{ 
+      width: '280px', 
+      flexShrink: 0, 
+      display: 'flex', 
+      flexDirection: 'column', 
+      background: 'var(--bg-dark)', 
+      borderRight: '1px solid var(--glass-border)',
+      position: 'relative',
+      zIndex: 10
+    }}>
+      <div style={{ padding: '32px 24px', borderBottom: '1px solid var(--glass-border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ 
+            width: '36px', 
+            height: '36px', 
+            borderRadius: '10px', 
+            background: 'linear-gradient(135deg, var(--accent-purple), var(--accent-blue))', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            boxShadow: '0 8px 24px rgba(168, 85, 247, 0.2)'
+          }}>
+            <LayoutDashboard size={22} color="white" />
           </div>
-          PM Dashboard
-        </h2>
-        <p style={{ margin: '8px 0 0 42px', fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500, opacity: 0.8 }}>공공 프로젝트 관리 시스템</p>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>PM Dashboard</h2>
+            <p style={{ margin: 0, fontSize: '10px', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.5px' }}>ENTERPRISE AI HUB</p>
+          </div>
+        </div>
       </div>
 
-      <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <div style={{ padding: '0 12px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>
-            Workspaces
-        </div>
-        {menuItems.map(item => {
+      <nav style={{ flex: 1, padding: '24px 12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        {menuItems.map((item) => {
           const isActive = activeMenu === item.id;
           return (
             <button
               key={item.id}
               onClick={() => setActiveMenu(item.id)}
-              className={`interactive ${isActive ? 'active' : ''}`}
+              className="interactive"
               style={{
+                width: '100%',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '14px',
-                padding: '14px 18px',
-                background: isActive ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
-                border: `1px solid ${isActive ? 'rgba(59, 130, 246, 0.25)' : 'transparent'}`,
-                borderRadius: '14px',
+                gap: '12px',
+                padding: '12px 16px',
+                borderRadius: '12px',
+                background: isActive ? 'rgba(168, 85, 247, 0.1)' : 'transparent',
+                border: 'none',
                 color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-                fontWeight: isActive ? 600 : 500,
                 cursor: 'pointer',
+                transition: 'all 0.2s',
                 textAlign: 'left',
-                width: '100%',
-                fontSize: '14px',
-                boxShadow: isActive ? '0 4px 12px rgba(0, 0, 0, 0.2)' : 'none'
+                fontWeight: isActive ? 700 : 500
               }}
             >
-              <div style={{ 
-                color: isActive ? 'var(--accent-blue)' : 'inherit',
-                transition: 'all 0.3s'
-              }}>{item.icon}</div>
-              {item.label}
+              <div style={{ color: isActive ? 'var(--accent-purple)' : 'var(--text-muted)' }}>
+                {item.icon}
+              </div>
+              <span style={{ fontSize: '14px' }}>{item.label}</span>
             </button>
-          )
+          );
         })}
       </nav>
 
-      <div style={{ marginTop: 'auto', borderTop: '1px solid var(--glass-border)', paddingTop: '24px' }}>
+      <div style={{ padding: '24px', borderTop: '1px solid var(--glass-border)' }}>
         <button
           className="interactive"
-          style={{
-            display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 18px',
-            background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'not-allowed', opacity: 0.5,
-            textAlign: 'left', width: '100%', fontSize: '14px'
-          }}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', color: 'var(--text-muted)', cursor: 'not-allowed', fontSize: '13px', opacity: 0.6 }}
           disabled
         >
-          <Settings size={20} />
-          환경 설정
+          <Settings size={18} /> 환경 설정
         </button>
       </div>
     </aside>

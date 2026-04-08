@@ -1,4 +1,4 @@
-export async function analyzeDocumentsWithLLM(guidelineText, artifactText, inspectionScope, apiKey, glossaryText) {
+export async function analyzeDocumentsWithLLM(guidelineText, artifactText, inspectionScope, apiKey, glossaryText, onProgress) {
     if (!apiKey) {
         throw new Error("API 키가 제공되지 않았습니다.");
     }
@@ -6,6 +6,7 @@ export async function analyzeDocumentsWithLLM(guidelineText, artifactText, inspe
     const isOnlyTypoCheck = !guidelineText || guidelineText.trim() === '';
     
     let systemPrompt = '';
+    if (onProgress) onProgress("분석 프롬프트 구성 중...");
     if (isOnlyTypoCheck) {
         systemPrompt = `[시스템 역할]
 당신은 최고의 섬세함과 엄격함을 지닌 교정 교열 전문 에이전트입니다. 시간이 아무리 오래 걸려도 좋으니, 제출된 문서의 **모든 문장을 단 하나도 빠짐없이 스플릿(split)하고 한 문장 한 문장 돋보기를 들이대듯 세밀하게 점검**해야 합니다. 대충 축소하거나 대표 예시만 나열하는 것은 엄격하게 금지됩니다.
@@ -40,52 +41,58 @@ export async function analyzeDocumentsWithLLM(guidelineText, artifactText, inspe
   ]
 }`;
     } else {
-        systemPrompt = `당신은 최고 수준의 IT 감리 전문가이자 다단계 산출물 기준문서 검증 AI입니다.
-당신의 임무는 '기준 문서(Base Document)'의 전체 내용을 단 한 줄도 빠짐없이 정밀 분석하여, 모든 문장을 **'개별 문장 단위(Atomic Sentence)'**로 요건화한 후 검증 문서(산출물)와 1:1 검증하는 것입니다.
+        systemPrompt = `당신은 최고 수준의 IT 감리 전문가이자 공공 프로젝트 산출물 검증 전문 에이전트입니다.
+당신의 임무는 입력된 **'기준 문서(Base Document)'**와 **'산출물(Artifact)'**의 성격과 특성을 먼저 파악하고, 그 상관관계에 기반하여 이행 여부 및 내용적 충분성(Adequacy)을 지능적으로 검증하는 것입니다.
 
-[핵심 규칙 - 절대 준수]
-1. 기준 문서의 **한 줄, 한 줄 빠짐없이 모든 문장**을 추출하여 산출물에 반영되었는지, 누락된 것은 없는지 철저히 검증하세요. (단, 단순 제목, 표의 헤더, 무의미한 인사말 등은 요건이 아니므로 추출 항목에서 완전히 제외하세요.)
-2. 실제 '구현, 설계, 준수'해야 할 내용이 담긴 모든 문장을 빠짐없이 추출하여 각각 개별 항목으로 만드세요. 여러 문장을 하나로 요약하거나 합치면(Merging) 절대 안 됩니다. 반드시 문장 단위로 분할하세요.
-3. 충족률(%)을 계산하지 마세요. 추출된 각 문장별로 산출물을 분석하여 오직 **'이행(O)', '부분 이행(△)', '미이행(X)'** 중 하나로 판정하세요.
-4. 산출물에서 내용이 **누락된 것은 반드시 '미이행(X)'**으로 판정하고 명시하세요. 구체적 실행 방안이나 명세가 없는 경우에도 '미이행(X)' 또는 '부분 이행(△)'으로 판정합니다.
-5. [핵심 지시사항] 산출물 품질 점검 시, 오탈자나 띄어쓰기 확인에만 그치지 말고 **논리적 일관성 확보 및 공공기관용 보고서 문체 다듬기**를 최우선으로 수색하세요. 다음 결함을 'typos' 배열에 최우선적으로 포함해야 합니다:
-   ① 목차와 본문 헤드라인 불일치
-   ② 앞/뒤 통계 및 수치 불일치
-   ③ 존재하지 않는 참조('그림 X', '표 Y')
-   ④ 주술 호응 오류 및 모호한 추상적 표현 (상세 기술 용어로 교정 필수)
-   ⑤ 끝맺음 어미 '~함', '~임' 등 개조식 문체 일관성 붕괴
-   이런 구조적/문체적 오류를 발견하면 reason에 '[구조/논리 결함]' 또는 '[가독성 결함]'이라는 말머리를 달아 확실히 지적해 주세요. (맞춤법 및 용어 사전 위배 사항도 함께 포함하되, **'6가지', '3개'처럼 아라비아 숫자에 단위가 붙어 쓰인 경우는 실무 완벽 허용이므로 절대 띄어쓰기 오류로 잡지 마세요.**)
+[검증 전 필수 분석: 문서의 특성 및 컨텍스트 파악]
+- 분석 시작 전, 기준 문서와 산출물의 내용을 대조하여 각 문서가 프로젝트의 어느 단계(예: 요건 정의, 업무 프로세스 분석, 시스템 설계 등)에 해당하는지 파악하십시오.
+- 입력된 문서의 특성을 고려하여 점검하십시오. (예: 기준 문서가 '프로세스 정의서'이고 산출물이 '응용아키텍처'라면, 업무 흐름이 아키텍처 컴포넌트나 인터페이스 설계에 어떻게 논리적으로 투영되었는지 도메인 지식을 활용하여 점검합니다.)
+
+[핵심 검증 원칙 - 지능적 전수 조사]
+1. **문장 단위 전수 추출 및 논리 대조**: 
+   - 기준 문서의 모든 본문 문장을 독립된 요건으로 추출하고, 산출물에서 그 요건이 '문서의 목적과 성격에 맞게' 적절히 반영되었는지 확인하십시오.
+2. **지능적 충분성(Adequacy) 판정 (오탈자 검사 제외)**:
+   - 이 모드에서는 단순 맞춤법보다는 **내용의 실질적 완성도와 논리적 완결성**에 집중합니다. (오탈자 점검은 별도 모드이므로 여기서 수행하지 마십시오.)
+   - **이행(O)**: 산출물의 특성에 맞게 기술 수준이 충분히 구체적이고 전문적으로 작성된 경우.
+   - **부분 이행(△)**: 언급은 있으나 문서의 특성상 기대되는 상세도가 낮거나 실행 방안이 모호한 경우.
+   - **미이행(X)**: 핵심 취지가 누락되었거나 문서 성격상 반드시 포함되어야 할 설계/수행 내용이 없는 경우.
+3. **전문가적 Gap 분석**:
+   - '부분 이행' 또는 '미이행' 시, 어떤 기술적/관리적 내용이 보완되어야 하는지 문서의 특성을 고려하여 구체적인 개선 방향을 'gap' 필드에 제시하십시오.
+4. **구조적 결함 및 정합성 수색 (typos 배열 활용)**:
+   - 오탈자가 아닌, **목차-본문 불일치, 수치 간의 모순, 존재하지 않는 기능 참조** 등 문서 전체의 구조적 결함을 발견 시 'typos' 배열에 전문적으로 기록하십시오.
 
 [출력 형식 제한]
-반드시 아래 JSON 형식으로만 출력하세요. (토큰 절약을 위해 rtm과 omissions 필드는 LLM 응답에서 생략합니다. requirementMapping과 typos에 집중하세요.)
+반드시 아래 JSON 형식으로만 출력하세요. 모든 항목은 JSON 배열 내의 개별 객체여야 합니다.
 {
-  "score": <총점(0~100 정수, 전체 이행 비율)>,
-  "inspectionScope": "<점검범위 텍스트 또는 null>",
-  "summary": "<분석에 대한 2~3문장 요약>",
+  "score": <총점(0~100 정수, 이행 비중 및 내용 충실도 기반)>,
+  "inspectionScope": "<전달받은 점검범위 또는 null>",
+  "summary": "<입력된 문서들의 특성(예: 프로세스 정의서 vs 설계서) 분석 결과와 이를 바탕으로 한 종합 검증 의견 (매우 상세하게)>",
   "requirementMapping": [
     {
       "id": "<REQ-001 부터 순차 부여>",
-      "category": "<요구사항 카테고리 (기능, 보안, 인프라 등)>",
+      "category": "<요구사항 카테고리>",
       "type": "<'필수' 또는 '선택'>",
       "levelLabel": "<'개별문장'>",
-      "path": "<상위 목차/문단 컨텍스트 (예: 2.1 보안 요건)>",
-      "requirement": "<추출된 개별 요구사항 문장 원문 그대로>",
-      "artifactSection": "<대응되는 산출물 페이지/위치 (없으면 '해당 없음')>",
-      "artifactContent": "<산출물에 작성된 설계/수행 내용 요약 (없으면 '관련 내용 없음')>",
+      "path": "<기준 문서 내 위치>",
+      "requirement": "<기준 문서에서 추출된 개별 문장 원문 그대로>",
+      "artifactSection": "<대응되는 산출물 위치 (없으면 '해당 없음')>",
+      "artifactContent": "<산출물의 문서 특성에 맞춰 재구성된 설계/반영 내용 요약 (없으면 '관련 내용 없음')>",
       "status": "<'이행(O)', '부분 이행(△)', '미이행(X)' 중 택 1>",
-      "gap": "<부분 이행/미이행 시 구체적 사유 및 부족한 점 (이행 시 null)>"
+      "gap": "<부족 사유 및 문서 특성을 고려한 구체적 보완 권고 (이행 시 null)>"
     }
   ],
   "typos": [
     {
-      "location": "<위치(문단/문장)>",
-      "originalText": "<기존 내용 (원문 그대로)>",
-      "correction": "<교정 제안>",
-      "reason": "<사유 (오류 유형 및 설명)>"
+      "location": "<위치>",
+      "originalText": "<원문>",
+      "correction": "<구조적 수정안>",
+      "reason": "<[구조 결함], [논리 상충] 등 머리말을 포함한 분석 사유>"
     }
   ]
 } `;
     }
+
+
 
 
     const userInput = isOnlyTypoCheck ? `
@@ -114,6 +121,7 @@ ${(artifactText || '').substring(0, 2000000)}
 --- 점검 범위 (해당 내용이 있으면 위주로 더 엄격히 볼 것) ---
 ${inspectionScope || '없음'}
 `;
+
 
     try {
         let targetModel = "models/gemini-3.0-flash";
@@ -159,13 +167,38 @@ ${inspectionScope || '없음'}
             })
         };
 
-        const response = await fetch(fetchUrl, fetchOptions);
+        // 재시도 로직이 포함된 fetch 호출
+        const fetchWithRetry = async (url, options, maxRetries = 5) => {
+            let retries = 0;
+            while (retries < maxRetries) {
+                if (onProgress && retries === 0) onProgress("Gemini 서버에 분석 요청 중...");
+                const response = await fetch(url, options);
+                
+                if (response.ok) return response;
+                
+                // 429: Too Many Requests (Quota Exceeded)
+                if (response.status === 429) {
+                    const baseWait = Math.pow(2, retries) * 3000;
+                    const jitter = Math.random() * 2000;
+                    const waitTime = baseWait + jitter; // 3s, 6s, 12s, 24s, 48s...
+                    
+                    const waitSec = Math.round(waitTime / 1000);
+                    console.warn(`[Gemini API] 할당량 초과. ${waitSec}초 후 재시도합니다... (시도 ${retries + 1}/${maxRetries})`);
+                    
+                    if (onProgress) onProgress(`API 할당량 초과... ${waitSec}초 후 자동 재시도 예정 (시도 ${retries + 1}/${maxRetries})`);
+                    
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                    retries++;
+                    continue;
+                }
+                
+                const err = await response.json();
+                throw new Error(err.error?.message || response.statusText);
+            }
+            throw new Error("현재 Gemini API 무료 티어의 할당량이 일시적으로 소진되었습니다. 약 1~2분 정도 대기하신 후 다시 [분석 시작]을 눌러주세요.");
+        };
 
-        if (!response.ok) {
-            const err = await response.json();
-            throw new Error(err.error?.message || response.statusText);
-        }
-
+        const response = await fetchWithRetry(fetchUrl, fetchOptions);
         const data = await response.json();
         let content = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
 
@@ -211,6 +244,10 @@ ${inspectionScope || '없음'}
         return parsed;
     } catch (e) {
         console.error("Gemini API Error:", e);
+        if (e.message.includes("quota")) {
+            throw new Error("Gemini API 할당량이 초과되었습니다. 무료 티어의 경우 분당 요청 횟수가 제한될 수 있으니 잠시 후(약 1분 뒤) 다시 시도해 주세요.");
+        }
         throw new Error(`Gemini 검증 실패: ${e.message}`);
     }
 }
+

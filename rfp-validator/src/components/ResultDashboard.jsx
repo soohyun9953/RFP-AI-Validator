@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldAlert, CheckCircle2, XCircle, FileWarning, AlertTriangle, ClipboardList, ArrowRightLeft, Download, PenTool } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, XCircle, FileWarning, AlertTriangle, ClipboardList, ArrowRightLeft, Download, PenTool, RotateCcw } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 /** 매핑 결과를 엑셀 파일로 내보내기 */
@@ -110,8 +110,8 @@ async function exportToExcel(data, isTypoMode = false) {
         }
     }
 
-    // ── 시트4: 문서 품질(오탈자 등) 점검 ──
-    if (data.typos && data.typos.length > 0) {
+    // ── 시트4: 문서 품질(오탈자 등) 점검 (오직 오탈자 점검 모드에서만 출력) ──
+    if (isTypoMode && data.typos && data.typos.length > 0) {
         const typoHeaders = [
             { header: '순번', key: '순번', width: 6 },
             { header: '페이지/위치', key: '위치', width: 25 },
@@ -160,14 +160,14 @@ async function exportToExcel(data, isTypoMode = false) {
     }
 }
 
-export default function ResultDashboard({ data, isTypoMode = false }) {
+export default function ResultDashboard({ data, isTypoMode = false, onRetry }) {
     if (!data) return null;
 
     return (
         <div className="glass-panel animate-fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '24px', gap: '24px', overflowY: 'auto' }}>
             {/* 점검범위 표시 */}
             {data.inspectionScope && (
-                <section style={{ padding: '14px 20px', background: 'rgba(59, 130, 246, 0.08)', borderRadius: '10px', border: '1px solid rgba(59, 130, 246, 0.2)', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                <section className="animate-slide-up" style={{ padding: '14px 20px', background: 'rgba(59, 130, 246, 0.08)', borderRadius: '10px', border: '1px solid rgba(59, 130, 246, 0.2)', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                     <ClipboardList size={18} color="var(--accent-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
                     <div>
                         <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--accent-color)' }}>적용된 점검범위</span>
@@ -177,7 +177,7 @@ export default function ResultDashboard({ data, isTypoMode = false }) {
             )}
 
             {/* 1. 종합 준수 현황 */}
-            <section style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <section className="animate-slide-up stagger-1" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
                     <div style={{ position: 'absolute', top: '-10%', left: '-10%', width: '40%', height: '40%', background: 'var(--success-color)', opacity: 0.1, filter: 'blur(40px)', borderRadius: '50%' }}></div>
                     <h3 style={{ margin: '0 0 24px', fontSize: '15px', color: 'var(--text-secondary)', fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase' }}>전체 요구사항 준수율</h3>
@@ -189,29 +189,53 @@ export default function ResultDashboard({ data, isTypoMode = false }) {
                     </div>
                 </div>
 
-                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                        <ShieldAlert size={20} color="var(--warning-color)" />
-                        <h3 style={{ margin: 0, fontSize: '18px', flex: 1 }}>종합 평가 보고서</h3>
-                        <button
-                            onClick={() => exportToExcel(data, isTypoMode)}
-                            className="interactive"
-                            style={{
-                                display: 'flex', alignItems: 'center', gap: '8px',
-                                padding: '10px 18px', fontSize: '14px', fontWeight: 600,
-                                background: 'rgba(34, 197, 94, 0.1)',
-                                color: 'var(--success-color)',
-                                border: '1px solid rgba(34, 197, 94, 0.2)',
-                                borderRadius: '10px',
-                                cursor: 'pointer',
-                                flexShrink: 0,
-                            }}
-                        >
-                            <Download size={18} />
-                            보고서 내보내기
-                        </button>
+                <div className="glass-panel animate-slide-up stagger-1" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '120px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'nowrap' }}>
+                        <ShieldAlert size={20} color={data.summary && (data.summary.includes('실패') || data.summary.includes('소진')) ? 'var(--danger-color)' : 'var(--warning-color)'} style={{ flexShrink: 0 }} />
+                        <h3 style={{ margin: 0, fontSize: '18px', flex: 1, whiteSpace: 'nowrap', minWidth: 'fit-content' }}>종합 평가 보고서</h3>
+                        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                            {data.summary && (data.summary.includes('실패') || data.summary.includes('소진')) && onRetry && (
+                                <button
+                                    onClick={onRetry}
+                                    className="interactive pulse-text"
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '8px',
+                                        padding: '10px 18px', fontSize: '14px', fontWeight: 700,
+                                        background: 'rgba(59, 130, 246, 0.15)',
+                                        color: 'var(--accent-blue)',
+                                        border: '2px solid var(--accent-blue)',
+                                        borderRadius: '10px',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    <RotateCcw size={18} />
+                                    지금 다시 시도
+                                </button>
+                            )}
+                            <button
+                                onClick={() => exportToExcel(data, isTypoMode)}
+                                className="interactive"
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                    padding: '10px 18px', fontSize: '14px', fontWeight: 600,
+                                    background: 'rgba(34, 197, 94, 0.1)',
+                                    color: 'var(--success-color)',
+                                    border: '1px solid rgba(34, 197, 94, 0.2)',
+                                    borderRadius: '10px',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                <Download size={18} />
+                                보고서 내보내기
+                            </button>
+                        </div>
                     </div>
-                    <p style={{ margin: 0, lineHeight: '1.6', color: 'var(--text-primary)', fontSize: '15px' }}>
+                    <p style={{ 
+                        margin: 0, lineHeight: '1.6', 
+                        color: data.summary && (data.summary.includes('실패') || data.summary.includes('소진')) ? 'var(--danger-color)' : 'var(--text-primary)', 
+                        fontSize: '15px',
+                        fontWeight: data.summary && (data.summary.includes('실패') || data.summary.includes('소진')) ? 500 : 400
+                    }}>
                         {data.summary}
                     </p>
                 </div>
@@ -219,7 +243,7 @@ export default function ResultDashboard({ data, isTypoMode = false }) {
 
             {/* 2. 요구사항 추적 매트릭스 (RTM) */}
             {data.rtm && data.rtm.length > 0 && (
-                <section className="glass-panel" style={{ padding: '24px' }}>
+                <section className="glass-panel animate-slide-up stagger-2" style={{ padding: '24px' }}>
                 <h3 style={{ margin: '0 0 16px', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <CheckCircle2 size={20} color="var(--accent-color)" />
                     요구사항 매핑 현황 (Semantic Map)
@@ -267,7 +291,7 @@ export default function ResultDashboard({ data, isTypoMode = false }) {
 
             {/* 2.5 요구사항별 산출물 매핑 상세 */}
             {data.requirementMapping && data.requirementMapping.length > 0 && (
-                <section className="glass-panel" style={{ padding: '24px' }}>
+                <section className="glass-panel animate-slide-up stagger-3" style={{ padding: '24px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                         <h3 style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
                             <ArrowRightLeft size={20} color="var(--accent-color)" />
@@ -418,7 +442,7 @@ export default function ResultDashboard({ data, isTypoMode = false }) {
 
             {/* 3. 주요 누락/비준수 상세 */}
             {data.omissions && data.omissions.length > 0 && (
-                <section className="glass-panel" style={{ padding: '24px' }}>
+                <section className="glass-panel animate-slide-up stagger-4" style={{ padding: '24px' }}>
                 <h3 style={{ margin: '0 0 16px', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <FileWarning size={20} color="var(--danger-color)" />
                     주요 누락(Omission) 및 비준수 사항
@@ -456,7 +480,7 @@ export default function ResultDashboard({ data, isTypoMode = false }) {
 
             {/* 4. 산출물 오탈자 및 용어 점검 결과 */}
             {data.typos && data.typos.length > 0 && (
-                <section className="glass-panel" style={{ padding: '24px' }}>
+                <section className="glass-panel animate-slide-up stagger-5" style={{ padding: '24px' }}>
                     <h3 style={{ margin: '0 0 16px', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <PenTool size={20} color="var(--warning-color)" />
                         ISMP 산출물 전문 교정/교열 결과

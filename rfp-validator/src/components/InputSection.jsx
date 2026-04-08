@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Target, FileText, Play, Loader2, Upload, X, ClipboardList, AlertCircle, FileSpreadsheet } from 'lucide-react';
+import { Target, FileText, Play, Loader2, Upload, X, ClipboardList, AlertCircle, FileSpreadsheet, ChevronLeft, ChevronRight } from 'lucide-react';
 import { processFile, ALL_ACCEPT, getFileExtension, classifyFile } from '../utils/fileExtractor';
 
 // ── 파일 타입 아이콘/라벨 ──────────────────────────────────────
@@ -72,6 +72,7 @@ function FileUploadArea({ label, icon: Icon, fileName, onFileSelect, onFileClear
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
+            className={isDragging ? 'cursor-copy' : ''}
         >
             <label style={{
                 fontSize: '14px', fontWeight: 500, color: 'var(--text-secondary)',
@@ -198,13 +199,14 @@ function FileUploadArea({ label, icon: Icon, fileName, onFileSelect, onFileClear
 }
 
 // ── 메인 InputSection ──────────────────────────────────────
-export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = false, onReset }) {
+export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = false, onReset, isMinimized, onToggleMinimize }) {
     const [activeTab, setActiveTab] = useState(isTypoMode ? 1 : 0);
     const [guideline, setGuideline] = useState('');
     const [artifact, setArtifact] = useState('');
     const [inspectionScope, setInspectionScope] = useState('');
     const [glossary, setGlossary] = useState('');
-    const [apiKey, setApiKey] = useState('');
+    
+    // 파일 정보 및 로딩 상태
     const [guidelineFile, setGuidelineFile] = useState('');
     const [artifactFile, setArtifactFile] = useState('');
     const [glossaryFile, setGlossaryFile] = useState('');
@@ -255,18 +257,47 @@ export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = fals
         }
     };
 
+    // ── 최소화 모드 렌더링 ──────────────────────────────────
+    if (isMinimized) {
+        return (
+            <div className="glass-panel animate-fade-in" style={{
+                width: '60px', display: 'flex', flexDirection: 'column', alignItems: 'center',
+                padding: '24px 0', gap: '30px', transition: 'width 0.3s ease', cursor: 'pointer'
+            }} onClick={onToggleMinimize}>
+                <button 
+                  className="interactive" 
+                  style={{ 
+                    background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', 
+                    borderRadius: '8px', padding: '8px', color: 'var(--accent-blue)', cursor: 'pointer' 
+                  }}
+                >
+                    <ChevronRight size={18} />
+                </button>
+                <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontSize: '14px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '4px', opacity: 0.5, whiteSpace: 'nowrap' }}>
+                    DATA INPUT SECTION
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="glass-panel animate-fade-in" style={{
             flex: 1, display: 'flex', flexDirection: 'column',
             padding: '24px', gap: '20px',
             minWidth: '400px',
+            cursor: isAnalyzing ? 'wait' : 'default',
+            transition: 'all 0.3s ease',
+            overflow: 'hidden'
         }}>
             <div style={{
                 display: 'flex', alignItems: 'center', gap: '8px',
                 borderBottom: '1px solid var(--panel-border)', paddingBottom: '16px',
             }}>
-                <FileText size={20} color="var(--accent-color)" />
-                <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>데이터 입력</h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    <FileText size={20} color="var(--accent-color)" />
+                    <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, whiteSpace: 'nowrap' }}>데이터 입력</h2>
+                </div>
+                
                 <button
                     onClick={handleReset}
                     title="전체 입력 초기화"
@@ -284,36 +315,46 @@ export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = fals
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
+                        whiteSpace: 'nowrap'
                     }}
                 >
                     <X size={14} /> 초기화
                 </button>
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
-                    <span style={{
-                        fontSize: '10px', padding: '3px 6px',
-                        background: 'rgba(239,68,68,0.1)', color: '#ef4444',
-                        borderRadius: '4px', fontWeight: 600,
-                    }}>PDF</span>
-                    <span style={{
-                        fontSize: '10px', padding: '3px 6px',
-                        background: 'rgba(34,197,94,0.1)', color: '#22c55e',
-                        borderRadius: '4px', fontWeight: 600,
-                    }}>Excel</span>
-                    <span style={{
-                        fontSize: '10px', padding: '3px 6px',
-                        background: 'rgba(249,115,22,0.1)', color: '#f97316',
-                        borderRadius: '4px', fontWeight: 600,
-                    }}>PPTX</span>
-                    <span style={{
-                        fontSize: '10px', padding: '3px 6px',
-                        background: 'rgba(14,165,233,0.1)', color: '#0ea5e9',
-                        borderRadius: '4px', fontWeight: 600,
-                    }}>HWPX</span>
-                    <span style={{
-                        fontSize: '10px', padding: '3px 6px',
-                        background: 'rgba(59,130,246,0.1)', color: '#3b82f6',
-                        borderRadius: '4px', fontWeight: 600,
-                    }}>TXT</span>
+
+                <button
+                    onClick={onToggleMinimize}
+                    title="입력 영역 접기"
+                    className="interactive"
+                    style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid var(--panel-border)',
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        color: 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        marginLeft: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        whiteSpace: 'nowrap'
+                    }}
+                >
+                    <ChevronLeft size={16} /> 접기
+                </button>
+
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    {['PDF', 'Excel', 'PPTX', 'HWPX', 'TXT'].map((ext, idx) => {
+                        const colors = ['#ef4444', '#22c55e', '#f97316', '#0ea5e9', '#3b82f6'];
+                        return (
+                            <span key={ext} style={{
+                                fontSize: '10px', padding: '3px 6px',
+                                background: `${colors[idx]}11`, color: colors[idx],
+                                borderRadius: '4px', fontWeight: 600, whiteSpace: 'nowrap'
+                            }}>{ext}</span>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -326,8 +367,7 @@ export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = fals
                 ] : [
                     { id: 0, label: '1. 기준 문서', icon: Target, hasData: !!guideline || !!guidelineFile },
                     { id: 1, label: '2. 산출물', icon: FileText, hasData: !!artifact || !!artifactFile },
-                    { id: 2, label: '3. 용어 사전', icon: FileSpreadsheet, hasData: !!glossary || !!glossaryFile },
-                    { id: 3, label: '4. 점검 범위', icon: ClipboardList, hasData: !!inspectionScope }
+                    { id: 3, label: '3. 점검 범위', icon: ClipboardList, hasData: !!inspectionScope }
                 ]).map(tab => (
                     <button
                         key={tab.id}
@@ -340,11 +380,12 @@ export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = fals
                             color: activeTab === tab.id ? 'var(--accent-color)' : 'var(--text-secondary)',
                             fontWeight: activeTab === tab.id ? 600 : 500, cursor: 'pointer',
                             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                            transition: 'all 0.2s', fontSize: '13px', position: 'relative'
+                            transition: 'all 0.2s', fontSize: '13px', position: 'relative',
+                            whiteSpace: 'nowrap'
                         }}
                     >
                         <tab.icon size={16} />
-                        {tab.label}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{tab.label}</span>
                         {tab.hasData && <span style={{ position: 'absolute', top: '8px', right: '8px', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--success-color)' }} />}
                     </button>
                 ))}
@@ -361,7 +402,7 @@ export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = fals
                         onFileClear={() => { setGuidelineFile(''); setGuideline(''); setGuidelineError(null); }}
                         textValue={guideline}
                         onTextChange={setGuideline}
-                        placeholder="기준 문서를 업로드하거나 좌측 텍스트를 입력하세요."
+                        placeholder="기준 문서를 업로드하거나 직접 텍스트를 입력하세요."
                         isLoading={guidelineLoading}
                         loadError={guidelineError}
                     />
@@ -437,7 +478,7 @@ export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = fals
                 ) : (
                     <>
                         <Play size={22} fill="currentColor" />
-                        {isTypoMode ? '문서 품질 정밀 점검 시작' : '엄격한 AI 4단계 검증 시작'}
+                        {isTypoMode ? '문서 품질 정밀 점검 시작' : '엄격한 AI 검증 시작'}
                     </>
                 )}
             </button>

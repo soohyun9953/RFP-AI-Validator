@@ -1,25 +1,43 @@
-import React, { useState, useCallback } from 'react';
-import { ArrowRight, Loader2, PenTool } from 'lucide-react';
+import React, { useState, useCallback, useRef } from 'react';
+import { ArrowRight, Loader2, PenTool, RotateCcw } from 'lucide-react';
 import InputSection from './InputSection';
 import ResultDashboard from './ResultDashboard';
 import { analyzeDocumentsWithLLM } from '../llmAnalyzer';
 
 function TypoValidator({ apiKey }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisStage, setAnalysisStage] = useState(0); // 1: 추출, 2: 심층분석
+  const [retryStatus, setRetryStatus] = useState(null); // API 재시도 상태 메시지
   const [resultData, setResultData] = useState(null);
+  const [isInputMinimized, setIsInputMinimized] = useState(false);
+  const lastParams = useRef(null);
 
   const handleAnalyze = useCallback(async (ignoredGuideline, artifact, inspectionScope, glossary) => {
+    lastParams.current = { artifact, inspectionScope, glossary };
     setIsAnalyzing(true);
     setResultData(null);
+    setRetryStatus(null);
+    setAnalysisStage(1);
+    setIsInputMinimized(true);
+
+    // 시각적 연출을 위한 인위적 지연 (UX 목적)
+    await new Promise(resolve => setTimeout(resolve, 2500));
+    setAnalysisStage(2);
 
     try {
       if (apiKey && apiKey.startsWith('AIza')) {
-        // Guideline을 빈 문자열로 전달하여 순수 Typo 교정 모드 강제 트리거
-        const result = await analyzeDocumentsWithLLM('', artifact, inspectionScope, apiKey, glossary);
+        const result = await analyzeDocumentsWithLLM(
+          '', artifact, inspectionScope, apiKey, glossary,
+          (status) => setRetryStatus(status)
+        );
         setResultData(result);
         setIsAnalyzing(false);
+        setAnalysisStage(0);
+        setRetryStatus(null);
       } else {
         setIsAnalyzing(false);
+        setAnalysisStage(0);
+        setRetryStatus(null);
         setResultData({
             score: 0,
             inspectionScope: inspectionScope || null,
@@ -42,12 +60,23 @@ function TypoValidator({ apiKey }) {
             typos: [],
         });
         setIsAnalyzing(false);
+        setAnalysisStage(0);
+        setRetryStatus(null);
     }
   }, [apiKey]);
+
+  const handleRetry = () => {
+    if (lastParams.current) {
+        const { artifact, inspectionScope, glossary } = lastParams.current;
+        handleAnalyze('', artifact, inspectionScope, glossary);
+    }
+  };
 
   const handleReset = () => {
     setResultData(null);
     setIsAnalyzing(false);
+    setAnalysisStage(0);
+    lastParams.current = null;
   };
 
   return (
@@ -55,15 +84,47 @@ function TypoValidator({ apiKey }) {
       <InputSection onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} isTypoMode={true} onReset={handleReset} />
 
       {isAnalyzing ? (
-        <div className="glass-panel animate-fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', padding: '40px', textAlign: 'center' }}>
-          <div style={{ position: 'relative', marginBottom: '32px' }}>
-            <div style={{ position: 'absolute', inset: -20, background: 'var(--accent-amber)', opacity: 0.2, filter: 'blur(30px)', borderRadius: '50%' }}></div>
-            <Loader2 size={64} color="var(--warning-color)" className="animate-spin" style={{ position: 'relative' }} />
+        <div className="glass-panel animate-fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', padding: '40px' }}>
+          <div className="scanning-container" style={{ marginBottom: '32px' }}>
+            <div className="scanning-line"></div>
+            <div style={{ padding: '15px', display: 'flex', flexDirection: 'column', gap: '8px', opacity: 0.4 }}>
+                {[...Array(6)].map((_, i) => (
+                    <div key={i} style={{ height: '6px', width: `${Math.random() * 40 + 40}%`, background: 'rgba(255,255,255,0.2)', borderRadius: '3px' }}></div>
+                ))}
+            </div>
           </div>
-          <h2 style={{ margin: '0 0 12px', fontSize: '24px', color: 'var(--text-primary)', fontWeight: 700, letterSpacing: '-0.5px' }}>AI 품질 및 문체 점검 중...</h2>
-          <p style={{ margin: 0, fontSize: '15px', maxWidth: '450px', lineHeight: '1.6', opacity: 0.8 }}>
-            단어와 문맥을 심층 분석하여 오탈자, 비문, 그리고 논리적 결함을 교정하고 있습니다.<br/>
-            전문 수석 감리원이 검토하는 수준의 정밀도가 적용됩니다.
+
+          <h2 className="pulse-text" style={{ margin: '0 0 16px', fontSize: '24px', color: 'var(--text-primary)', fontWeight: 700, letterSpacing: '-0.5px' }}>
+            {analysisStage === 1 ? '전수 문장 단위 도출 중...' : 'AI 품질 및 문체 점검 중...'}
+          </h2>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+            <div className={`page-container active`} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '15px', opacity: analysisStage >= 1 ? 1 : 0.3 }}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: analysisStage > 1 ? 'var(--success-color)' : 'var(--accent-blue)', boxShadow: analysisStage === 1 ? '0 0 10px var(--accent-blue)' : 'none' }}></div>
+                <span style={{ color: analysisStage === 1 ? 'var(--text-primary)' : 'var(--text-muted)' }}>1단계: 산출물 문장 단위 전수 스캐닝</span>
+                {analysisStage > 1 && <span style={{ color: 'var(--success-color)', fontSize: '12px', fontWeight: 700 }}>완료</span>}
+            </div>
+            <div className={`page-container active`} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '15px', opacity: analysisStage >= 2 ? 1 : 0.3 }}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: analysisStage === 2 ? 'var(--accent-blue)' : 'rgba(255,255,255,0.1)', boxShadow: analysisStage === 2 ? '0 0 10px var(--accent-blue)' : 'none' }}></div>
+                <span style={{ color: analysisStage === 2 ? 'var(--text-primary)' : 'var(--text-muted)' }}>2단계: AI 문맥 분석 및 교정교열 가이드 생성</span>
+            </div>
+          </div>
+
+          <div className="progress-track" style={{ width: '350px' }}>
+            <div className="progress-fill" style={{ width: analysisStage === 1 ? '45%' : '90%' }}></div>
+          </div>
+
+          {retryStatus && (
+            <div className="animate-fade-in" style={{ marginTop: '20px', padding: '10px 20px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '10px', color: 'var(--warning-color)', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Loader2 size={14} className="animate-spin" />
+                {retryStatus}
+            </div>
+          )}
+
+          <p style={{ marginTop: '24px', fontSize: '14px', color: 'var(--text-muted)', maxWidth: '400px', textAlign: 'center', lineHeight: '1.6' }}>
+            {analysisStage === 1 
+                ? '분석 대상 문서의 모든 문장을 하나하나 읽어 들이며 분석 대상을 추출하고 있습니다.' 
+                : '추출된 문장들의 오탈자, 비문, 용어 일관성을 수석 감리원 수준으로 점검하고 있습니다.'}
           </p>
         </div>
       ) : resultData ? (
@@ -90,18 +151,18 @@ function TypoValidator({ apiKey }) {
               <ArrowRight size={16} style={{ transform: 'rotate(180deg)' }} /> 결과 닫기
             </button>
           </div>
-          <ResultDashboard data={resultData} isTypoMode={true} />
+          <ResultDashboard data={resultData} isTypoMode={true} onRetry={handleRetry} />
         </div>
       ) : (
         <div className="glass-panel animate-fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', padding: '40px' }}>
-          <div style={{ padding: '32px', borderRadius: '50%', background: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.1)', marginBottom: '32px', boxShadow: '0 0 40px rgba(245, 158, 11, 0.1)' }}>
-            <PenTool size={56} color="var(--warning-color)" opacity={0.6} />
+          <div style={{ padding: '32px', borderRadius: '50%', background: 'rgba(168, 85, 247, 0.05)', border: '1px solid rgba(168, 85, 247, 0.1)', marginBottom: '32px', boxShadow: '0 0 40px rgba(168, 85, 247, 0.1)' }}>
+            <PenTool size={56} color="var(--accent-purple)" opacity={0.6} />
           </div>
           <h2 style={{ margin: '0 0 16px', fontSize: '24px', color: 'var(--text-primary)', fontWeight: 700, letterSpacing: '-0.5px' }}>분석 대기 중</h2>
           <div style={{ maxWidth: '420px', textAlign: 'center', lineHeight: '1.7', fontSize: '15px', color: 'var(--text-secondary)' }}>
             <p style={{ marginBottom: '16px' }}>좌측 영역에 <strong style={{ color: 'var(--text-primary)' }}>&lt;검증 대상 문서&gt;</strong> 내용을 입력하거나 파일을 업로드하세요.</p>
-            <div style={{ background: 'rgba(59, 130, 246, 0.05)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.1)', color: 'var(--text-muted)', fontSize: '13px' }}>
-                💡 <span style={{ color: 'var(--accent-blue)', fontWeight: 600 }}>Tip:</span> 전문적인 오탈자 및 문체 교정을 위해 우측 상단에 Gemini API Key 입력을 확인해 주세요.
+            <div style={{ background: 'rgba(168, 85, 247, 0.05)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(168, 85, 247, 0.1)', color: 'var(--text-muted)', fontSize: '13px' }}>
+                💡 <span style={{ color: 'var(--accent-purple)', fontWeight: 600 }}>Tip:</span> 전문적인 오탈자 및 문체 교정을 위해 우측 상단에 Gemini API Key 입력을 확인해 주세요.
             </div>
           </div>
         </div>

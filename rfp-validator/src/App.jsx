@@ -14,10 +14,8 @@ function App() {
   const [isManualOpen, setIsManualOpen] = useState(false);
   const [refModal, setRefModal] = useState({ open: false, title: '', content: '', blob: null, ext: '', filename: '' });
 
-  // 법률 및 가이드 클릭 시 사용자 등록 문서 검색을 위한 통합 핸들러
+  // ... (useEffect for open_reference_modal remains the same) ...
   useEffect(() => {
-    // LawConsultant 내부에서 발생하는 이벤트를 가로채거나 
-    // 전역 window 이벤트를 통해 LawConsultant가 모달을 요청할 수 있게 함
     const handleOpenRef = (e) => {
         setRefModal({ 
             open: true, 
@@ -38,35 +36,33 @@ function App() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', backgroundColor: 'var(--bg-dark)', overflow: 'hidden', position: 'relative' }}>
-      {/* Abstract Background Glows */}
-      <div className="bg-glow-container">
-        <div className="glow-blob glow-blue"></div>
-        <div className="glow-emerald"></div>
-        <div className="glow-violet"></div>
+      {/* Subtle Background Glows */}
+      <div className="bg-glow-container" style={{ opacity: 0.4 }}>
+        <div className="glow-blob" style={{ background: 'var(--accent-purple)', top: '20%', right: '10%', filter: 'blur(150px)', opacity: 0.1 }}></div>
       </div>
 
       <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
       
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '24px 32px', gap: '24px', position: 'relative', zIndex: 1 }}>
-        <header className="glass-panel animate-slide-up" style={{ padding: '24px 32px', display: 'flex', alignItems: 'center', gap: '20px', flexShrink: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '24px 32px', gap: '24px', position: 'relative', zIndex: 1, background: 'var(--bg-dark)' }}>
+        <header className="glass-panel animate-slide-up" style={{ padding: '24px 32px', display: 'flex', alignItems: 'center', gap: '20px', flexShrink: 0, border: '1px solid var(--glass-border)' }}>
           {activeMenu === 'validator' ? (
-            <ShieldCheck size={36} color="var(--success-color)" />
+            <ShieldCheck size={36} color="var(--accent-purple)" />
           ) : activeMenu === 'typo' ? (
-            <PenTool size={36} color="var(--warning-color)" />
-          ) : activeMenu === 'law' ? (
-            <Fingerprint size={36} color="var(--accent-color)" />
+            <PenTool size={36} color="var(--accent-blue)" />
+          ) : activeMenu === 'law' || activeMenu === 'law_general' ? (
+            <Fingerprint size={36} color="var(--accent-purple)" />
           ) : (
-            <Scale size={36} color="var(--success-color)" />
+            <Library size={36} color="var(--accent-blue)" />
           )}
           <div style={{ flex: 1 }}>
-            <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 600, letterSpacing: '-0.5px' }}>
+            <h1 key={`title-${activeMenu}`} className="animate-fade-in" style={{ margin: 0, fontSize: '24px', fontWeight: 700, letterSpacing: '-0.5px', color: 'var(--text-primary)' }}>
               {activeMenu === 'validator' ? 'AI Document Validator' 
                 : activeMenu === 'typo' ? 'AI Quality & Typo Checker' 
                 : activeMenu === 'law' ? 'AI Legal & Compliance Advisor (MCP)' 
                 : activeMenu === 'reference' ? 'Reference Library Management'
                 : 'AI Legal Advisor (Gemini)'}
             </h1>
-            <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)', fontSize: '14px' }}>
+            <p key={`desc-${activeMenu}`} className="animate-fade-in" style={{ margin: '4px 0 0', color: 'var(--text-secondary)', fontSize: '14px', animationDelay: '0.1s' }}>
               {activeMenu === 'validator' 
                 ? '수석 감리 전문가 - 다단계 산출물 및 기준문서 자동 검증 시스템'
                 : activeMenu === 'typo'
@@ -75,16 +71,16 @@ function App() {
                 ? '공공사업 PM 특화 - 소프트웨어 진흥법 및 국가계약법 실시간 자문'
                 : activeMenu === 'reference'
                 ? '사용자 등록 문서 보관소 - AI 답변 및 검토의 객관적 근거가 되는 참고자료 관리'
-                : '지식 기반 자문 - Gemini의 내부 학습 데이터를 이용한 빠른 규정 검토'}
+                : '지식 기반 자문 - Gemini의 내부 지식을 이용한 빠른 규정 검토'}
             </p>
           </div>
           <button 
               onClick={() => setIsManualOpen(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)', padding: '8px 16px', borderRadius: '8px', color: 'var(--accent-color)', cursor: 'pointer', transition: 'all 0.2s', fontWeight: 600, fontSize: '13px' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(168, 85, 247, 0.1)', border: '1px solid rgba(168, 85, 247, 0.2)', padding: '8px 16px', borderRadius: '10px', color: 'var(--accent-purple)', cursor: 'pointer', transition: 'all 0.2s', fontWeight: 600, fontSize: '13px' }}>
               <BookOpen size={16} /> 간단 사용 방법
           </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.05)', padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
-            <Key size={16} color="var(--text-secondary)" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.03)', padding: '8px 16px', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
+            <Key size={16} color="var(--text-muted)" />
             <input
               type="password"
               placeholder="Gemini API Key (AIza...)"
@@ -95,24 +91,24 @@ function App() {
                 width: '180px', fontSize: '13px'
               }}
             />
-            {apiKey && apiKey.startsWith('AIza') && <span style={{ fontSize: '11px', color: 'var(--success-color)', fontWeight: 600 }}>LLM 활성</span>}
+            {apiKey && apiKey.startsWith('AIza') && <span style={{ fontSize: '11px', color: 'var(--accent-purple)', fontWeight: 600 }}>LLM 활성</span>}
           </div>
         </header>
 
         <main style={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}>
-          <div style={{ display: activeMenu === 'validator' ? 'block' : 'none', height: '100%' }}>
+          <div className={`page-container ${activeMenu === 'validator' ? 'active' : 'inactive'}`}>
             <DocumentValidator apiKey={apiKey} />
           </div>
-          <div style={{ display: activeMenu === 'typo' ? 'block' : 'none', height: '100%' }}>
+          <div className={`page-container ${activeMenu === 'typo' ? 'active' : 'inactive'}`}>
             <TypoValidator apiKey={apiKey} />
           </div>
-          <div style={{ display: activeMenu === 'law' ? 'block' : 'none', height: '100%' }}>
+          <div className={`page-container ${activeMenu === 'law' ? 'active' : 'inactive'}`}>
             <LawConsultant key="mcp-advisor" apiKey={apiKey} isMcpMode={true} />
           </div>
-          <div style={{ display: activeMenu === 'law_general' ? 'block' : 'none', height: '100%' }}>
+          <div className={`page-container ${activeMenu === 'law_general' ? 'active' : 'inactive'}`}>
             <LawConsultant key="general-advisor" apiKey={apiKey} isMcpMode={false} />
           </div>
-          <div style={{ display: activeMenu === 'reference' ? 'block' : 'none', height: '100%' }}>
+          <div className={`page-container ${activeMenu === 'reference' ? 'active' : 'inactive'}`}>
             <ReferenceLibrary />
           </div>
         </main>

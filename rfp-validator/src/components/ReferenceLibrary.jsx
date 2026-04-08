@@ -213,25 +213,18 @@ const ReferenceLibrary = () => {
     );
 
     return (
-        <div style={{ 
-            height: '100%', 
-            display: 'flex', 
-            flexDirection: 'column', 
-            padding: '32px', 
-            background: 'var(--bg-dark)', 
-            overflowY: 'auto', 
-            position: 'relative',
-            cursor: (isClearing || isProcessing) ? 'wait' : 'default'
-        }}>
-            <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                <div>
-                    <h2 style={{ margin: 0, fontSize: '24px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 700, letterSpacing: '-0.5px' }}>
-                        <Library size={32} color="var(--accent-blue)" /> 참고 자료 저장소
-                    </h2>
-                    <p style={{ margin: '8px 0 0', fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                        검토 및 답변 시 법적 근거가 되는 사용자 등록 문서들을 IndexedDB에 안전하게 보관합니다.
-                    </p>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+            <div className="glass-panel animate-slide-up" style={{ padding: '24px 32px', marginBottom: '32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid var(--panel-border)', borderRadius: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                    <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(168, 85, 247, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(168, 85, 247, 0.2)' }}>
+                        <Library size={28} color="var(--accent-purple)" />
+                    </div>
+                    <div>
+                        <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>참고자료 보관소</h2>
+                        <p style={{ margin: '4px 0 0', fontSize: '14px', color: 'var(--text-secondary)' }}>AI 분석 및 자문의 근거가 되는 사용자 등록 지침 보관소</p>
+                    </div>
                 </div>
+                
                 <div style={{ display: 'flex', gap: '12px' }}>
                     <button 
                         type="button"
@@ -239,15 +232,10 @@ const ReferenceLibrary = () => {
                         disabled={isClearing}
                         className="interactive"
                         style={{ 
-                            padding: '12px 20px', borderRadius: '12px', fontWeight: 600, 
+                            padding: '10px 18px', borderRadius: '10px', fontWeight: 600, 
                             display: 'flex', alignItems: 'center', gap: '8px',
-                            background: 'rgba(239, 68, 68, 0.1)',
-                            border: '1px solid rgba(239, 68, 68, 0.2)',
-                            color: 'var(--danger-color)',
-                            fontSize: '13px',
-                            cursor: isClearing ? 'wait' : 'pointer',
-                            minWidth: '120px',
-                            justifyContent: 'center'
+                            background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)',
+                            color: 'var(--danger-color)', fontSize: '13px', cursor: isClearing ? 'wait' : 'pointer'
                         }}
                     >
                         {isClearing ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
@@ -258,18 +246,20 @@ const ReferenceLibrary = () => {
                         onClick={() => setIsAdding(!isAdding)}
                         className="primary interactive"
                         style={{ 
-                            padding: '12px 24px', borderRadius: '12px', fontWeight: 700, 
+                            padding: '10px 20px', borderRadius: '10px', fontWeight: 700, 
                             display: 'flex', alignItems: 'center', gap: '8px',
-                            background: isAdding ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, var(--accent-blue), var(--accent-violet))',
+                            background: isAdding ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, var(--accent-purple), var(--accent-blue))',
                             border: isAdding ? '1px solid var(--glass-border)' : 'none',
-                            color: isAdding ? 'var(--text-secondary)' : 'white',
-                            boxShadow: isAdding ? 'none' : '0 8px 24px rgba(59, 130, 246, 0.25)'
+                            color: 'white', fontSize: '13px',
+                            boxShadow: isAdding ? 'none' : '0 8px 24px rgba(168, 85, 247, 0.2)'
                         }}
                     >
                         {isAdding ? <CloseIcon size={18} /> : <Plus size={18} />} {isAdding ? '닫기' : '새 파일 등록'}
                     </button>
                 </div>
             </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 4px 40px' }}>
 
             {isAdding && (
                 <div role="form" className="glass-panel animate-slide-up" style={{ marginBottom: '32px', padding: '32px', border: '1px solid var(--glass-border)' }}>
@@ -469,6 +459,7 @@ const ReferenceLibrary = () => {
                     </div>
                 </div>
             )}
+            </div>
         </div>
     );
 };

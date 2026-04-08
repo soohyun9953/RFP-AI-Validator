@@ -179,7 +179,7 @@ function LawConsultant({ apiKey, isMcpMode = true }) {
     <div className="glass-panel animate-fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', border: '1px solid var(--panel-border)', borderRadius: '12px' }}>
       {/* Header */}
       <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--panel-border)', background: 'rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-        {isMcpMode ? <Scale size={24} color="var(--accent-color)" /> : <Sparkles size={24} color="var(--success-color)" />}
+        {isMcpMode ? <Scale size={24} color="var(--accent-purple)" /> : <Sparkles size={24} color="var(--success-color)" />}
         <div>
           <h2 style={{ margin: 0, fontSize: '18px', color: 'var(--text-primary)' }}>
             {isMcpMode ? 'AI 법률/규정 자문 에이전트 (MCP)' : 'AI 법률/규정 일반 자문 (Gemini)'}
