@@ -85,25 +85,23 @@ function FileUploadArea({ label, icon: Icon, fileName, onFileSelect, onFileClear
                 <button
                     onClick={() => fileRef.current?.click()}
                     disabled={isLoading}
+                    className="interactive"
                     style={{
-                        display: 'flex', alignItems: 'center', gap: '6px',
-                        padding: '8px 14px', fontSize: '13px', fontWeight: 500,
-                        background: 'rgba(59, 130, 246, 0.12)',
-                        color: 'var(--accent-color)',
-                        border: '1px dashed rgba(59,130,246,0.4)',
-                        borderRadius: '6px',
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        padding: '10px 16px', fontSize: '13px', fontWeight: 600,
+                        background: 'rgba(59, 130, 246, 0.1)',
+                        color: 'var(--accent-blue)',
+                        border: '1px solid rgba(59, 130, 246, 0.2)',
+                        borderRadius: '10px',
                         cursor: isLoading ? 'wait' : 'pointer',
-                        transition: 'all 0.2s',
                         flexShrink: 0,
                         opacity: isLoading ? 0.6 : 1,
                     }}
-                    onMouseEnter={e => { if (!isLoading) e.currentTarget.style.background = 'rgba(59,130,246,0.2)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.12)'; }}
                 >
                     {isLoading
-                        ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
-                        : <Upload size={14} />}
-                    {isLoading ? loadingLabel : '파일 선택'}
+                        ? <Loader2 size={16} className="animate-spin" />
+                        : <Upload size={16} />}
+                    {isLoading ? loadingLabel : '파일 업로드'}
                 </button>
                 {fileName && (
                     <div style={{
@@ -272,25 +270,23 @@ export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = fals
                 <button
                     onClick={handleReset}
                     title="전체 입력 초기화"
+                    className="interactive"
                     style={{
                         background: 'rgba(239, 68, 68, 0.1)',
                         border: '1px solid rgba(239, 68, 68, 0.2)',
-                        padding: '4px 8px',
-                        borderRadius: '6px',
+                        padding: '6px 12px',
+                        borderRadius: '8px',
                         color: 'var(--danger-color)',
                         cursor: 'pointer',
-                        fontSize: '11px',
+                        fontSize: '12px',
                         fontWeight: 600,
                         marginLeft: '12px',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '4px',
-                        transition: 'all 0.2s'
+                        gap: '6px',
                     }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
                 >
-                    <X size={12} /> 입력 초기화
+                    <X size={14} /> 초기화
                 </button>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
                     <span style={{
@@ -417,26 +413,31 @@ export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = fals
             </div>
 
             <button
-                className="primary"
+                className="primary interactive"
                 onClick={() => onAnalyze(guideline, artifact, inspectionScope, glossary)}
                 disabled={isAnalyzing || guidelineLoading || artifactLoading || glossaryLoading || ((!isTypoMode && !guideline && !artifact && !glossary) || (isTypoMode && !artifact))}
                 style={{
-                    marginTop: '8px',
+                    marginTop: '12px',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    gap: '8px', padding: '16px', fontSize: '16px',
+                    gap: '10px', padding: '18px', fontSize: '17px', fontWeight: 700,
+                    background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-violet))',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '16px',
+                    boxShadow: '0 8px 24px rgba(59, 130, 246, 0.25)',
                     opacity: (isAnalyzing || guidelineLoading || artifactLoading || glossaryLoading || ((!isTypoMode && !guideline && !artifact && !glossary) || (isTypoMode && !artifact))) ? 0.6 : 1,
                     cursor: (isAnalyzing || guidelineLoading || artifactLoading || glossaryLoading || ((!isTypoMode && !guideline && !artifact && !glossary) || (isTypoMode && !artifact))) ? 'not-allowed' : 'pointer',
                 }}
             >
                 {isAnalyzing ? (
                     <>
-                        <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
-                        {isTypoMode ? 'AI 교정/교열 진행 중...' : 'AI 검증 진행 중...'}
+                        <Loader2 size={24} className="animate-spin" />
+                        {isTypoMode ? 'AI 분석 중...' : 'AI 검증 중...'}
                     </>
                 ) : (
                     <>
-                        <Play size={20} />
-                        {isTypoMode ? '문서 품질 정밀 점검 시작' : '엄격한 검증 시작 (4단계 추론)'}
+                        <Play size={22} fill="currentColor" />
+                        {isTypoMode ? '문서 품질 정밀 점검 시작' : '엄격한 AI 4단계 검증 시작'}
                     </>
                 )}
             </button>

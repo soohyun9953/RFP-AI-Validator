@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './index.css';
 import ReferenceLibrary from './components/ReferenceLibrary';
-import { ShieldCheck, Key, HelpCircle, X, BookOpen, Fingerprint, PenTool, Scale, Library, Info, Clock, Trash2, ArrowUpRight } from 'lucide-react';
+import { ShieldCheck, Key, HelpCircle, X, BookOpen, Fingerprint, PenTool, Scale, Library, Info, Clock, Trash2, ArrowUpRight, FileText, ExternalLink } from 'lucide-react';
 import { Analytics } from "@vercel/analytics/react";
 import Sidebar from './components/Sidebar';
 import DocumentValidator from './components/DocumentValidator';
@@ -12,14 +12,21 @@ function App() {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
   const [activeMenu, setActiveMenu] = useState('validator'); // 'validator' or 'law'
   const [isManualOpen, setIsManualOpen] = useState(false);
-  const [refModal, setRefModal] = useState({ open: false, title: '', content: '' });
+  const [refModal, setRefModal] = useState({ open: false, title: '', content: '', blob: null, ext: '', filename: '' });
 
   // 법률 및 가이드 클릭 시 사용자 등록 문서 검색을 위한 통합 핸들러
   useEffect(() => {
     // LawConsultant 내부에서 발생하는 이벤트를 가로채거나 
     // 전역 window 이벤트를 통해 LawConsultant가 모달을 요청할 수 있게 함
     const handleOpenRef = (e) => {
-        setRefModal({ open: true, title: e.detail.title, content: e.detail.content });
+        setRefModal({ 
+            open: true, 
+            title: e.detail.title, 
+            content: e.detail.content,
+            blob: e.detail.blob,
+            ext: e.detail.ext,
+            filename: e.detail.filename
+        });
     };
     window.addEventListener('open_reference_modal', handleOpenRef);
     return () => window.removeEventListener('open_reference_modal', handleOpenRef);
@@ -30,11 +37,18 @@ function App() {
   }, [apiKey]);
 
   return (
-    <div style={{ display: 'flex', height: '100vh', backgroundColor: 'var(--bg-primary)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100vh', backgroundColor: 'var(--bg-dark)', overflow: 'hidden', position: 'relative' }}>
+      {/* Abstract Background Glows */}
+      <div className="bg-glow-container">
+        <div className="glow-blob glow-blue"></div>
+        <div className="glow-emerald"></div>
+        <div className="glow-violet"></div>
+      </div>
+
       <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
       
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '24px', gap: '20px' }}>
-        <header className="glass-panel" style={{ padding: '20px 30px', display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '24px 32px', gap: '24px', position: 'relative', zIndex: 1 }}>
+        <header className="glass-panel animate-slide-up" style={{ padding: '24px 32px', display: 'flex', alignItems: 'center', gap: '20px', flexShrink: 0 }}>
           {activeMenu === 'validator' ? (
             <ShieldCheck size={36} color="var(--success-color)" />
           ) : activeMenu === 'typo' ? (
@@ -46,7 +60,11 @@ function App() {
           )}
           <div style={{ flex: 1 }}>
             <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 600, letterSpacing: '-0.5px' }}>
-              {activeMenu === 'validator' ? 'AI Document Validator' : activeMenu === 'typo' ? 'AI Quality & Typo Checker' : activeMenu === 'law' ? 'AI Legal & Compliance Advisor (MCP)' : 'AI Legal Advisor (Gemini)'}
+              {activeMenu === 'validator' ? 'AI Document Validator' 
+                : activeMenu === 'typo' ? 'AI Quality & Typo Checker' 
+                : activeMenu === 'law' ? 'AI Legal & Compliance Advisor (MCP)' 
+                : activeMenu === 'reference' ? 'Reference Library Management'
+                : 'AI Legal Advisor (Gemini)'}
             </h1>
             <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)', fontSize: '14px' }}>
               {activeMenu === 'validator' 
@@ -55,6 +73,8 @@ function App() {
                 ? '교정교열 전문가 - 산출물 품질 점검 및 다층 로직/오탈자 검증'
                 : activeMenu === 'law'
                 ? '공공사업 PM 특화 - 소프트웨어 진흥법 및 국가계약법 실시간 자문'
+                : activeMenu === 'reference'
+                ? '사용자 등록 문서 보관소 - AI 답변 및 검토의 객관적 근거가 되는 참고자료 관리'
                 : '지식 기반 자문 - Gemini의 내부 학습 데이터를 이용한 빠른 규정 검토'}
             </p>
           </div>
@@ -87,10 +107,10 @@ function App() {
             <TypoValidator apiKey={apiKey} />
           </div>
           <div style={{ display: activeMenu === 'law' ? 'block' : 'none', height: '100%' }}>
-            <LawConsultant apiKey={apiKey} isMcpMode={true} />
+            <LawConsultant key="mcp-advisor" apiKey={apiKey} isMcpMode={true} />
           </div>
           <div style={{ display: activeMenu === 'law_general' ? 'block' : 'none', height: '100%' }}>
-            <LawConsultant apiKey={apiKey} isMcpMode={false} />
+            <LawConsultant key="general-advisor" apiKey={apiKey} isMcpMode={false} />
           </div>
           <div style={{ display: activeMenu === 'reference' ? 'block' : 'none', height: '100%' }}>
             <ReferenceLibrary />
@@ -151,19 +171,90 @@ function App() {
         )}
         {/* 참고 문서 내용 표시용 통합 모달 */}
         {refModal.open && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
-              <div className="glass-panel animate-fade-in" style={{ width: '700px', maxWidth: '90%', maxHeight: '80vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-secondary)', border: '1px solid var(--panel-border)', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8)' }}>
-                  <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--panel-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(to right, rgba(59, 130, 246, 0.1), transparent)' }}>
-                      <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <FileText size={20} color="var(--accent-color)" /> {refModal.title}
-                      </h3>
-                      <button onClick={() => setRefModal({ ...refModal, open: false })} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%' }}><X size={18} /></button>
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
+              <div className="glass-panel animate-fade-in" style={{ width: '95vw', height: '90vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-secondary)', border: '1px solid var(--panel-border)', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 1)' }}>
+                  {/* Header */}
+                  <div style={{ padding: '20px 32px', borderBottom: '1px solid var(--panel-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.3)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <Library size={24} color="var(--accent-color)" />
+                          <div>
+                              <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--text-primary)', fontWeight: 700 }}>{refModal.title}</h3>
+                              {refModal.filename && <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{refModal.filename}</span>}
+                          </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          <button 
+                              onClick={() => {
+                                  if (refModal.blob) {
+                                      window.open(URL.createObjectURL(refModal.blob), '_blank');
+                                  } else {
+                                      const newWin = window.open('', '_blank');
+                                      if (newWin) {
+                                          newWin.document.write(`<pre style="white-space: pre-wrap; font-family: sans-serif; padding: 20px;">${refModal.content}</pre>`);
+                                          newWin.document.title = refModal.title;
+                                          newWin.document.close();
+                                      }
+                                  }
+                              }}
+                              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid var(--panel-border)', color: 'var(--text-primary)', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}
+                          >
+                              <ExternalLink size={14} /> 새 탭에서 열기
+                          </button>
+                          {refModal.blob && (
+                              <button 
+                                  onClick={() => {
+                                      const url = URL.createObjectURL(refModal.blob);
+                                      const a = document.createElement('a');
+                                      a.href = url;
+                                      a.download = refModal.filename || 'download';
+                                      a.click();
+                                      URL.revokeObjectURL(url);
+                                  }}
+                                  style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)', color: 'var(--accent-color)', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}
+                              >
+                                  <ArrowUpRight size={14} /> 원본 다운로드
+                              </button>
+                          )}
+                          <button onClick={() => setRefModal({ ...refModal, open: false })} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '50%' }}><X size={24} /></button>
+                      </div>
+
                   </div>
-                  <div style={{ padding: '32px', overflowY: 'auto', flex: 1, color: 'var(--text-primary)', lineHeight: '1.7', fontSize: '15px', whiteSpace: 'pre-wrap' }}>
-                      {refModal.content}
+
+                  {/* Content Area */}
+                  <div style={{ flex: 1, position: 'relative', background: '#0a0a0a', overflow: 'hidden', display: 'flex' }}>
+                      {refModal.blob ? (
+                          <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                              {(refModal.ext === 'pdf') ? (
+                                  <iframe 
+                                      src={URL.createObjectURL(refModal.blob) + '#toolbar=0'} 
+                                      style={{ width: '100%', height: '100%', border: 'none' }}
+                                      title="PDF Viewer"
+                                  />
+                              ) : (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(refModal.ext)) ? (
+                                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                                      <img src={URL.createObjectURL(refModal.blob)} alt="Preview" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px', border: '1px solid var(--panel-border)' }} />
+                                  </div>
+                              ) : (
+                                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                                      <div style={{ padding: '20px 32px', background: 'rgba(59, 130, 246, 0.05)', borderBottom: '1px solid var(--panel-border)', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                          ⚠️ 해당 파일 형식은 브라우저에서 직접 볼 수 없어 텍스트 미리보기를 표시합니다. 상단의 버튼을 통해 원본을 다운로드할 수 있습니다.
+                                      </div>
+                                      <div style={{ flex: 1, padding: '32px', overflowY: 'auto', color: 'var(--text-primary)', lineHeight: '1.8', fontSize: '15px', whiteSpace: 'pre-wrap' }}>
+                                          {refModal.content}
+                                      </div>
+                                  </div>
+                              )}
+                          </div>
+                      ) : (
+                          <div style={{ flex: 1, padding: '40px', overflowY: 'auto', color: 'var(--text-primary)', lineHeight: '1.8', fontSize: '16px', whiteSpace: 'pre-wrap', background: 'var(--bg-primary)' }}>
+                              {refModal.content}
+                          </div>
+                      )}
                   </div>
-                  <div style={{ padding: '16px 24px', borderTop: '1px solid var(--panel-border)', display: 'flex', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.1)' }}>
-                      <button onClick={() => setRefModal({ ...refModal, open: false })} style={{ background: 'var(--accent-color)', color: 'white', border: 'none', padding: '8px 24px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>닫기</button>
+
+                  {/* Footer */}
+                  <div style={{ padding: '16px 32px', borderTop: '1px solid var(--panel-border)', display: 'flex', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.2)' }}>
+                      <button onClick={() => setRefModal({ ...refModal, open: false })} style={{ background: 'var(--accent-color)', color: 'white', border: 'none', padding: '12px 32px', borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '15px' }}>문서 닫기</button>
                   </div>
               </div>
           </div>

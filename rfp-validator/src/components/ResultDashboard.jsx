@@ -178,11 +178,13 @@ export default function ResultDashboard({ data, isTypoMode = false }) {
 
             {/* 1. 종합 준수 현황 */}
             <section style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                    <h3 style={{ margin: '0 0 16px', fontSize: '16px', color: 'var(--text-secondary)' }}>전체 준수율</h3>
-                    <div style={{ position: 'relative', width: '120px', height: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', background: `conic-gradient(var(--success-color) ${data.score}%, rgba(255,255,255,0.1) 0)` }}>
-                        <div style={{ position: 'absolute', width: '90px', height: '90px', background: 'var(--panel-bg)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', fontWeight: 'bold' }}>
-                            {data.score}%
+                <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+                    <div style={{ position: 'absolute', top: '-10%', left: '-10%', width: '40%', height: '40%', background: 'var(--success-color)', opacity: 0.1, filter: 'blur(40px)', borderRadius: '50%' }}></div>
+                    <h3 style={{ margin: '0 0 24px', fontSize: '15px', color: 'var(--text-secondary)', fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase' }}>전체 요구사항 준수율</h3>
+                    <div style={{ position: 'relative', width: '160px', height: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', background: `conic-gradient(var(--success-color) ${data.score}%, rgba(255,255,255,0.05) 0)`, boxShadow: '0 0 30px rgba(16, 185, 129, 0.15)' }}>
+                        <div style={{ position: 'absolute', width: '130px', height: '130px', background: 'var(--bg-secondary)', borderRadius: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', boxShadow: 'inset 0 0 20px rgba(0,0,0,0.4)' }}>
+                            <span style={{ fontSize: '38px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-1px' }}>{data.score}%</span>
+                            <span style={{ fontSize: '11px', color: 'var(--success-color)', fontWeight: 600, marginTop: '-4px' }}>COMPLIANCE</span>
                         </div>
                     </div>
                 </div>
@@ -193,22 +195,20 @@ export default function ResultDashboard({ data, isTypoMode = false }) {
                         <h3 style={{ margin: 0, fontSize: '18px', flex: 1 }}>종합 평가 보고서</h3>
                         <button
                             onClick={() => exportToExcel(data, isTypoMode)}
+                            className="interactive"
                             style={{
-                                display: 'flex', alignItems: 'center', gap: '6px',
-                                padding: '8px 16px', fontSize: '13px', fontWeight: 600,
-                                background: 'rgba(34, 197, 94, 0.12)',
-                                color: '#22c55e',
-                                border: '1px solid rgba(34, 197, 94, 0.3)',
-                                borderRadius: '6px',
+                                display: 'flex', alignItems: 'center', gap: '8px',
+                                padding: '10px 18px', fontSize: '14px', fontWeight: 600,
+                                background: 'rgba(34, 197, 94, 0.1)',
+                                color: 'var(--success-color)',
+                                border: '1px solid rgba(34, 197, 94, 0.2)',
+                                borderRadius: '10px',
                                 cursor: 'pointer',
-                                transition: 'all 0.2s',
                                 flexShrink: 0,
                             }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(34,197,94,0.2)'}
-                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(34,197,94,0.12)'}
                         >
-                            <Download size={16} />
-                            결과 엑셀 저장
+                            <Download size={18} />
+                            보고서 내보내기
                         </button>
                     </div>
                     <p style={{ margin: 0, lineHeight: '1.6', color: 'var(--text-primary)', fontSize: '15px' }}>
@@ -323,9 +323,13 @@ export default function ResultDashboard({ data, isTypoMode = false }) {
 
                             return (
                                 <div key={idx} style={{
-                                    background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '18px',
-                                    borderLeft: `4px solid ${statusColor}`,
-                                }}>
+                                    background: 'rgba(255,255,255,0.02)', borderRadius: '16px', padding: '24px',
+                                    border: '1px solid var(--glass-border)',
+                                    borderLeft: `5px solid ${statusColor}`,
+                                    transition: 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                                }}
+                                className="interactive"
+                                >
                                     {/* 헤더: ID + 필수/선택 + 분류 + 상태 */}
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
                                         <span style={{

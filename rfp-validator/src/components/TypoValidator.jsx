@@ -55,48 +55,55 @@ function TypoValidator({ apiKey }) {
       <InputSection onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} isTypoMode={true} onReset={handleReset} />
 
       {isAnalyzing ? (
-        <div className="glass-panel animate-fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
-          <Loader2 size={48} color="var(--warning-color)" style={{ animation: 'spin 1.2s linear infinite', marginBottom: '20px' }} />
-          <h2 style={{ margin: '0 0 8px', fontSize: '20px', color: 'var(--text-primary)' }}>문서 품질 및 문체 점검 진행 중...</h2>
-          <p style={{ margin: 0, fontSize: '14px' }}>단어와 문맥을 파악하여 오탈자, 비문, 논리적 결함을 교정하고 있습니다. (최대 10~20초 소요)</p>
+        <div className="glass-panel animate-fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', padding: '40px', textAlign: 'center' }}>
+          <div style={{ position: 'relative', marginBottom: '32px' }}>
+            <div style={{ position: 'absolute', inset: -20, background: 'var(--accent-amber)', opacity: 0.2, filter: 'blur(30px)', borderRadius: '50%' }}></div>
+            <Loader2 size={64} color="var(--warning-color)" className="animate-spin" style={{ position: 'relative' }} />
+          </div>
+          <h2 style={{ margin: '0 0 12px', fontSize: '24px', color: 'var(--text-primary)', fontWeight: 700, letterSpacing: '-0.5px' }}>AI 품질 및 문체 점검 중...</h2>
+          <p style={{ margin: 0, fontSize: '15px', maxWidth: '450px', lineHeight: '1.6', opacity: 0.8 }}>
+            단어와 문맥을 심층 분석하여 오탈자, 비문, 그리고 논리적 결함을 교정하고 있습니다.<br/>
+            전문 수석 감리원이 검토하는 수준의 정밀도가 적용됩니다.
+          </p>
         </div>
       ) : resultData ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', position: 'relative' }}>
-          <div style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 10 }}>
+          <div style={{ position: 'absolute', top: '24px', right: '24px', zIndex: 10 }}>
             <button 
               onClick={() => setResultData(null)}
+              className="interactive"
               style={{
-                background: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid var(--panel-border)',
-                padding: '6px 12px',
-                borderRadius: '6px',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid var(--glass-border)',
+                padding: '8px 16px',
+                borderRadius: '10px',
                 color: 'var(--text-secondary)',
-                fontSize: '12px',
+                fontSize: '13px',
+                fontWeight: 600,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                backdropFilter: 'blur(4px)'
+                gap: '8px',
+                backdropFilter: 'blur(8px)'
               }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
             >
-              <ArrowRight size={14} style={{ transform: 'rotate(180deg)' }} /> 교정 결과 닫기
+              <ArrowRight size={16} style={{ transform: 'rotate(180deg)' }} /> 결과 닫기
             </button>
           </div>
           <ResultDashboard data={resultData} isTypoMode={true} />
         </div>
       ) : (
-        <div className="glass-panel animate-fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
-          <div style={{ padding: '24px', borderRadius: '50%', background: 'rgba(245, 158, 11, 0.1)', marginBottom: '24px' }}>
-            <ArrowRight size={48} color="var(--warning-color)" opacity={0.5} />
+        <div className="glass-panel animate-fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', padding: '40px' }}>
+          <div style={{ padding: '32px', borderRadius: '50%', background: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.1)', marginBottom: '32px', boxShadow: '0 0 40px rgba(245, 158, 11, 0.1)' }}>
+            <PenTool size={56} color="var(--warning-color)" opacity={0.6} />
           </div>
-          <h2 style={{ margin: '0 0 12px', fontSize: '20px', color: 'var(--text-primary)' }}>대기 중</h2>
-          <p style={{ margin: 0, maxWidth: '400px', textAlign: 'center', lineHeight: '1.6' }}>
-            우측 상단에 Gemini API Key를 입력하면 전문적인 문서 품질 및 오탈자/문맥 교정이 수행됩니다.<br /><br />
-            좌측 영역에 &lt;검증 대상 문서&gt; 내용을 입력하고<br />
-            <strong style={{ color: 'var(--warning-color)' }}>문서 품질 정밀 점검 시작</strong> 버튼을 누르면 AI 교정/교열 결과가 이곳에 표시됩니다.
-          </p>
+          <h2 style={{ margin: '0 0 16px', fontSize: '24px', color: 'var(--text-primary)', fontWeight: 700, letterSpacing: '-0.5px' }}>분석 대기 중</h2>
+          <div style={{ maxWidth: '420px', textAlign: 'center', lineHeight: '1.7', fontSize: '15px', color: 'var(--text-secondary)' }}>
+            <p style={{ marginBottom: '16px' }}>좌측 영역에 <strong style={{ color: 'var(--text-primary)' }}>&lt;검증 대상 문서&gt;</strong> 내용을 입력하거나 파일을 업로드하세요.</p>
+            <div style={{ background: 'rgba(59, 130, 246, 0.05)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.1)', color: 'var(--text-muted)', fontSize: '13px' }}>
+                💡 <span style={{ color: 'var(--accent-blue)', fontWeight: 600 }}>Tip:</span> 전문적인 오탈자 및 문체 교정을 위해 우측 상단에 Gemini API Key 입력을 확인해 주세요.
+            </div>
+          </div>
         </div>
       )}
     </div>
