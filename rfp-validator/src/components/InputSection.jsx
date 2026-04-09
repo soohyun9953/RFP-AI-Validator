@@ -496,11 +496,11 @@ export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = fals
                     marginTop: '12px',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     gap: '10px', padding: '18px', fontSize: '17px', fontWeight: 700,
-                    background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-violet))',
+                    background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
                     color: 'white',
                     border: 'none',
                     borderRadius: '16px',
-                    boxShadow: '0 8px 24px rgba(59, 130, 246, 0.25)',
+                    boxShadow: '0 8px 24px rgba(37, 99, 235, 0.3)',
                     opacity: (isAnalyzing || guidelineLoading || artifactLoading || glossaryLoading || ((!isTypoMode && !guideline && !artifact && !glossary) || (isTypoMode && !artifact))) ? 0.6 : 1,
                     cursor: (isAnalyzing || guidelineLoading || artifactLoading || glossaryLoading || ((!isTypoMode && !guideline && !artifact && !glossary) || (isTypoMode && !artifact))) ? 'not-allowed' : 'pointer',
                 }}

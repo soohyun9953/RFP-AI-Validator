@@ -3,7 +3,7 @@ import { ShieldCheck, Scale, FileText, Settings, LayoutDashboard, PenTool, Libra
 
 function Sidebar({ activeMenu, setActiveMenu }) {
   const menuItems = [
-    { id: 'validator', label: 'AI 산출물 검증 (ISMP/RFP)', icon: <FileText size={20} /> },
+    { id: 'validator', label: 'AI 산출물 검증', icon: <FileText size={20} /> },
     { id: 'typo', label: 'AI 문서 품질/오탈자 점검', icon: <PenTool size={20} /> },
     { id: 'law_general', label: 'AI 법률 자문 (Gemini)', icon: <Scale size={20} /> },
     { id: 'law', label: 'AI 법률 자문 (MCP)', icon: <Fingerprint size={20} /> },

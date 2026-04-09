@@ -46,21 +46,21 @@ function App() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '24px 32px', gap: '24px', position: 'relative', zIndex: 1, background: 'var(--bg-dark)' }}>
         <header className="glass-panel animate-slide-up" style={{ padding: '24px 32px', display: 'flex', alignItems: 'center', gap: '20px', flexShrink: 0, border: '1px solid var(--glass-border)' }}>
           {activeMenu === 'validator' ? (
-            <ShieldCheck size={36} color="var(--accent-purple)" />
+            <ShieldCheck size={36} color="var(--accent-blue)" />
           ) : activeMenu === 'typo' ? (
             <PenTool size={36} color="var(--accent-blue)" />
           ) : activeMenu === 'law' || activeMenu === 'law_general' ? (
-            <Fingerprint size={36} color="var(--accent-purple)" />
+            <Fingerprint size={36} color="var(--accent-blue)" />
           ) : (
             <Library size={36} color="var(--accent-blue)" />
           )}
           <div style={{ flex: 1 }}>
             <h1 key={`title-${activeMenu}`} className="animate-fade-in" style={{ margin: 0, fontSize: '24px', fontWeight: 700, letterSpacing: '-0.5px', color: 'var(--text-primary)' }}>
-              {activeMenu === 'validator' ? 'AI Document Validator' 
-                : activeMenu === 'typo' ? 'AI Quality & Typo Checker' 
-                : activeMenu === 'law' ? 'AI Legal & Compliance Advisor (MCP)' 
-                : activeMenu === 'reference' ? 'Reference Library Management'
-                : 'AI Legal Advisor (Gemini)'}
+              {activeMenu === 'validator' ? 'AI 산출물 검증' 
+                : activeMenu === 'typo' ? 'AI 문서 품질/오탈자 점검' 
+                : activeMenu === 'law' ? 'AI 법률 자문 (MCP)' 
+                : activeMenu === 'reference' ? '참고 자료 관리'
+                : 'AI 법률 자문 (Gemini)'}
             </h1>
             <p key={`desc-${activeMenu}`} className="animate-fade-in" style={{ margin: '4px 0 0', color: 'var(--text-secondary)', fontSize: '14px', animationDelay: '0.1s' }}>
               {activeMenu === 'validator' 
