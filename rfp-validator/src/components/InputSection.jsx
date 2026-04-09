@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Target, FileText, Play, Loader2, Upload, X, ClipboardList, AlertCircle, FileSpreadsheet, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Target, FileText, Play, Loader2, Upload, X, ClipboardList, AlertCircle, FileSpreadsheet, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { processFile, ALL_ACCEPT, getFileExtension, classifyFile } from '../utils/fileExtractor';
 
 // ── 파일 타입 아이콘/라벨 ──────────────────────────────────────
@@ -74,12 +74,28 @@ function FileUploadArea({ label, icon: Icon, fileName, onFileSelect, onFileClear
             onDrop={handleDrop}
             className={isDragging ? 'cursor-copy' : ''}
         >
-            <label style={{
-                fontSize: '14px', fontWeight: 500, color: 'var(--text-secondary)',
-                display: 'flex', alignItems: 'center', gap: '6px',
-            }}>
-                <Icon size={16} /> {label}
-            </label>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label style={{
+                    fontSize: '14px', fontWeight: 500, color: 'var(--text-secondary)',
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                }}>
+                    <Icon size={16} /> {label}
+                </label>
+                {/* 개별 지우기 버튼 추가 */}
+                {(fileName || textValue) && !isLoading && (
+                    <button
+                        onClick={onFileClear}
+                        className="interactive"
+                        style={{
+                            background: 'transparent', border: 'none', color: 'var(--text-secondary)',
+                            fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
+                            opacity: 0.7
+                        }}
+                    >
+                        <Trash2 size={13} /> 내용 지우기
+                    </button>
+                )}
+            </div>
 
             {/* 파일 선택 버튼 + 파일명 */}
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -204,18 +220,27 @@ export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = fals
     const [guideline, setGuideline] = useState('');
     const [artifact, setArtifact] = useState('');
     const [inspectionScope, setInspectionScope] = useState('');
-    const [glossary, setGlossary] = useState('');
+    const [glossary, setGlossary] = useState(() => localStorage.getItem('rfp_glossary') || '');
     
     // 파일 정보 및 로딩 상태
     const [guidelineFile, setGuidelineFile] = useState('');
     const [artifactFile, setArtifactFile] = useState('');
-    const [glossaryFile, setGlossaryFile] = useState('');
+    const [glossaryFile, setGlossaryFile] = useState(() => localStorage.getItem('rfp_glossary_file') || '');
     const [guidelineLoading, setGuidelineLoading] = useState(false);
     const [artifactLoading, setArtifactLoading] = useState(false);
     const [glossaryLoading, setGlossaryLoading] = useState(false);
     const [guidelineError, setGuidelineError] = useState(null);
     const [artifactError, setArtifactError] = useState(null);
     const [glossaryError, setGlossaryError] = useState(null);
+    
+    // 용어사전 영속성 동기화
+    React.useEffect(() => {
+        localStorage.setItem('rfp_glossary', glossary);
+    }, [glossary]);
+
+    React.useEffect(() => {
+        localStorage.setItem('rfp_glossary_file', glossaryFile);
+    }, [glossaryFile]);
 
     const handleGuidelineFile = (name, content, loading = false, error = null) => {
         setGuidelineFile(name);
@@ -242,17 +267,14 @@ export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = fals
     };
 
     const handleReset = () => {
-        if (window.confirm('입력된 모든 데이터(파일 및 텍스트)를 초기화하시겠습니까?')) {
+        if (window.confirm('입력된 문서 데이터(기준문서, 산출물, 점검범위)를 초기화하시겠습니까?\n(용어사전은 보존됩니다)')) {
             setGuideline('');
             setArtifact('');
             setInspectionScope('');
-            setGlossary('');
             setGuidelineFile('');
             setArtifactFile('');
-            setGlossaryFile('');
             setGuidelineError(null);
             setArtifactError(null);
-            setGlossaryError(null);
             if (onReset) onReset();
         }
     };
@@ -437,12 +459,25 @@ export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = fals
                 )}
                 {activeTab === 3 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, background: 'var(--bg-secondary)', padding: '16px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
-                        <label style={{
-                            fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)',
-                            display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px'
-                        }}>
-                            <ClipboardList size={18} color="var(--accent-color)" /> 검증 포커스 영역 및 개별 테스트 규칙
-                        </label>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                            <label style={{
+                                fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)',
+                                display: 'flex', alignItems: 'center', gap: '8px'
+                            }}>
+                                <ClipboardList size={18} color="var(--accent-color)" /> 검증 포커스 영역 및 개별 테스트 규칙
+                            </label>
+                            {inspectionScope && (
+                                <button
+                                    onClick={() => setInspectionScope('')}
+                                    style={{
+                                        background: 'transparent', border: 'none', color: 'var(--text-secondary)',
+                                        fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                                    }}
+                                >
+                                    <Trash2 size={12} /> 필드 지우기
+                                </button>
+                            )}
+                        </div>
                         <textarea
                             placeholder="예시: CSR-011 요구사항 항목만을 중심으로 집중 점검하세요. 목차 일관성보다 문장 간 논리성에 더 큰 가중치를 두어 검사해주세요."
                             value={inspectionScope}
