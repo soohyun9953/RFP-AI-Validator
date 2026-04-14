@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Database, Download, FileText, Upload, Loader2, Play, CheckCircle2, AlertCircle, Info, Trash2, X, ChevronDown, Code2, BarChart3, BookOpen, Eye, Copy, Check } from 'lucide-react';
+import { Database, Download, FileText, Upload, Loader2, Play, CheckCircle2, AlertCircle, Info, Trash2, X, ChevronDown, Code2, BarChart3, BookOpen, Eye, Copy, Check, FileSpreadsheet } from 'lucide-react';
 import mermaid from 'mermaid';
+import * as XLSX from 'xlsx';
 import { analyzeERDWithLLM } from '../erdAnalyzer';
 import { processFile, ALL_ACCEPT } from '../utils/fileExtractor';
 
@@ -20,10 +21,15 @@ const MermaidDiagram = ({ chart }) => {
       try {
         mermaid.render(id, chart).then(({ svg }) => {
           if (containerRef.current) containerRef.current.innerHTML = svg;
+        }).catch(e => {
+            console.error("Mermaid Render Error:", e);
+            if (containerRef.current)
+              containerRef.current.innerHTML = `<div style="color:var(--danger-color);padding:20px;display:flex;align-items:center;justify-content:center;height:100%;">다이어그램 렌더링에 실패했습니다. (Mermaid 소스 탭의 문법을 참조하세요)</div>`;
         });
       } catch (e) {
+        console.error("Mermaid Sync Error:", e);
         if (containerRef.current)
-          containerRef.current.innerHTML = `<div style="color:var(--danger-color);padding:20px;">다이어그램 렌더링 오류가 발생했습니다.</div>`;
+          containerRef.current.innerHTML = `<div style="color:var(--danger-color);padding:20px;display:flex;align-items:center;justify-content:center;height:100%;">다이어그램 렌더링에 실패했습니다.</div>`;
       }
     }
   }, [chart]);
@@ -157,12 +163,168 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
     { id: 'entities', label: '엔티티 & 속성 명세', icon: Database },
     { id: 'relations', label: '관계 & 정규화', icon: BookOpen },
     { id: 'source', label: 'Mermaid 소스', icon: Code2 },
+    { id: 'dbml', label: 'DBML 소스 (dbdiagram)', icon: Code2 },
   ];
 
-  const handleCopyMermaid = () => {
-    navigator.clipboard.writeText(result.mermaidCode);
+  const getDbmlCode = useCallback(() => {
+    if (!result || !result.entities) return '';
+    let dbml = '';
+    result.entities.forEach(entity => {
+      dbml += `Table "${entity.description || entity.name}" {\\n`;
+      if (entity.attributes) {
+        entity.attributes.forEach(attr => {
+          let rawType = attr.type || '';
+          let pureType = rawType;
+          const match = rawType.match(/^([a-zA-Z_]+)(?:\\((\\d+)\\))?/);
+          if (match) pureType = match[1];
+
+          let mods = [];
+          if (attr.key === 'PK') mods.push('pk');
+          if (attr.desc) {
+            const safeDesc = attr.desc.replace(/\\\\n/g, ' ').replace(/\\n/g, ' ').replace(/'/g, "''").replace(/\\\\/g, '');
+            mods.push(`note: '${safeDesc}'`);
+          }
+          let modsStr = mods.length > 0 ? ` [${mods.join(', ')}]` : '';
+          dbml += `  "${attr.name}" ${pureType.toUpperCase()}${modsStr}\\n`;
+        });
+      }
+      if (entity.reason) {
+        const safeReason = entity.reason.replace(/\\\\n/g, ' ').replace(/\\n/g, ' ').replace(/'/g, "''").replace(/\\\\/g, '');
+        dbml += `  Note: '${safeReason}'\\n`;
+      }
+      dbml += `}\\n\\n`;
+    });
+
+    if (result.relationships) {
+      result.relationships.forEach(rel => {
+        const fromEnt = result.entities.find(e => e.name === rel.from);
+        const toEnt = result.entities.find(e => e.name === rel.to);
+        const fromName = fromEnt ? (fromEnt.description || fromEnt.name) : rel.from;
+        const toName = toEnt ? (toEnt.description || toEnt.name) : rel.to;
+        
+        let fromCol = fromEnt?.attributes?.find(a => a.key === 'PK')?.name || 'id';
+        let toCol = toEnt?.attributes?.find(a => a.key === 'FK')?.name || toEnt?.attributes?.[0]?.name || 'id';
+
+        let link = '-';
+        if (rel.type.includes('1:N')) link = '<';
+        if (rel.type.includes('N:M') || rel.type.includes('M:N')) link = '<>';
+
+        const safeRelDesc = (rel.desc || '').replace(/\\\\n/g, ' ').replace(/\\n/g, ' ').replace(/\\\\/g, '');
+        dbml += `Ref: "${fromName}"."${fromCol}" ${link} "${toName}"."${toCol}" // ${safeRelDesc}\\n`;
+      });
+    }
+    return dbml;
+  }, [result]);
+
+  const handleCopyCode = (codeText) => {
+    navigator.clipboard.writeText(codeText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleExportExcel = () => {
+    if (!result || !result.entities) return;
+    
+    // 1. 엔티티 정의서 시트 데이터 (양식 적용)
+    const entityData = result.entities.map((entity, idx) => {
+      // 속성 배열을 개행문자(\n)로 연결, PK나 FK가 있으면 접미사 추가
+      let attrString = '';
+      if (entity.attributes && entity.attributes.length > 0) {
+        attrString = entity.attributes.map(attr => {
+          let suffix = '';
+          if (attr.key === 'PK') suffix = '(PK)';
+          else if (attr.key === 'FK') suffix = '(FK)';
+          return attr.name + suffix;
+        }).join('\n');
+      }
+
+      return {
+        'No': idx + 1,
+        '엔티티(한글)': entity.description || '',
+        '엔티티(영문)': entity.name || '',
+        '설명': entity.reason || '',
+        '주요 속성': attrString
+      };
+    });
+
+    // 2. 속성 정의서 시트 데이터 (양식 적용)
+    const attributeData = [];
+    let attrIdx = 1;
+    result.entities.forEach(entity => {
+      if (entity.attributes && entity.attributes.length > 0) {
+        entity.attributes.forEach(attr => {
+          // 데이터타입에서 길이(숫자) 분리. ex: varchar(50) -> 타입: varchar, 길이: 50
+          let rawType = attr.type || '';
+          let pureType = rawType;
+          let length = '';
+          const match = rawType.match(/^([a-zA-Z_]+)(?:\\((\\d+)\\))?/);
+          if (match) {
+            pureType = match[1];
+            if (match[2]) length = match[2];
+          }
+
+          attributeData.push({
+            'No': attrIdx++,
+            '엔터티': entity.description || entity.name,
+            '속성명(한)': attr.name || '',
+            '속성명(영)': '',
+            'PK/FK': attr.key === 'PK' || attr.key === 'FK' ? attr.key : '',
+            '참조엔터티': attr.key === 'FK' ? '(확인필요)' : '',
+            '데이터타입': pureType.toUpperCase(),
+            '길이': length,
+            'NULL': attr.key === 'PK' ? 'N' : 'Y',
+            '기본값': '',
+            '도메인/허용값': '',
+            '정의': attr.desc || ''
+          });
+        });
+      }
+    });
+
+    // 3. 관계 및 정규화 시트 데이터 (양식 적용)
+    const relationData = [];
+    if (result.relationships && result.relationships.length > 0) {
+      result.relationships.forEach(rel => {
+        const fromEnt = result.entities.find(e => e.name === rel.from);
+        const toEnt = result.entities.find(e => e.name === rel.to);
+        const fromName = fromEnt ? (fromEnt.description || fromEnt.name) : rel.from;
+        const toName = toEnt ? (toEnt.description || toEnt.name) : rel.to;
+
+        relationData.push({
+          'FROM 엔터티': fromName,
+          '관계': rel.type,
+          'TO 엔터티': toName,
+          '설명': rel.desc || ''
+        });
+      });
+    }
+    
+    // 정규화 노트를 같은 시트 아래쪽에 추가
+    relationData.push({}); // 빈 줄
+    relationData.push({
+      'FROM 엔터티': '[정규화 준수 논거]',
+      '관계': result.normalizationNotes || ''
+    });
+
+    // 4. Mermaid 소스코드 시트 데이터
+    const mermaidData = result.mermaidCode.split('\n').map(line => ({
+      'Mermaid 다이어그램 소스코드 (mermaid.live 에서 사용 가능)': line
+    }));
+
+    // 5. DBML 소스코드 시트 데이터
+    const dbmlData = getDbmlCode().split('\n').map(line => ({
+      'DBML 다이어그램 소스코드 (dbdiagram.io 에서 사용 가능)': line
+    }));
+
+    const workbook = XLSX.utils.book_new();
+    
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(entityData), "엔티티정의서");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(attributeData), "속성정의서");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(relationData), "관계및정규화");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(mermaidData), "Mermaid코드");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(dbmlData), "DBML코드");
+    
+    XLSX.writeFile(workbook, `ERD_상세설계서_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   return (
@@ -171,9 +333,13 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0px 24px', borderBottom: '1px solid var(--panel-border)',
-        background: 'rgba(0,0,0,0.2)', flexShrink: 0
+        background: 'rgba(0,0,0,0.2)', flexShrink: 0, gap: '16px'
       }}>
-        <div style={{ display: 'flex' }}>
+        <div style={{ 
+          display: 'flex', overflowX: 'auto', flex: 1, 
+          msOverflowStyle: 'none', scrollbarWidth: 'none' 
+        }} className="hide-scrollbar">
+          <style>{`.hide-scrollbar::-webkit-scrollbar { display: none; }`}</style>
           {tabs.map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -184,7 +350,7 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
                 color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
                 fontWeight: isActive ? 700 : 500, fontSize: '13px', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: '7px',
-                transition: 'all 0.2s', marginBottom: '-1px'
+                transition: 'all 0.2s', marginBottom: '-1px', whiteSpace: 'nowrap', flexShrink: 0
               }}>
                 <Icon size={15} color={isActive ? 'var(--accent-purple)' : 'inherit'} />
                 {tab.label}
@@ -192,14 +358,22 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
             );
           })}
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', flexShrink: 0 }}>
           <button onClick={onOpenJsonViewer} className="interactive" style={{
             padding: '8px 16px', borderRadius: '8px', border: '1px solid rgba(168,85,247,0.3)',
             background: 'rgba(168,85,247,0.08)', color: 'var(--accent-purple)',
             fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: '6px'
+            display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap'
           }}>
             <Eye size={14} /> JSON 원문 보기
+          </button>
+          <button onClick={handleExportExcel} className="interactive" style={{
+            padding: '8px 16px', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.3)',
+            background: 'rgba(16,185,129,0.08)', color: 'var(--success-color)',
+            fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap'
+          }}>
+            <FileSpreadsheet size={14} /> 엑셀 저장
           </button>
           <button onClick={() => {
             const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' });
@@ -212,7 +386,7 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
             padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--panel-border)',
             background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)',
             fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: '6px'
+            display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap'
           }}>
             <Download size={14} /> JSON 저장
           </button>
@@ -358,15 +532,20 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
           </div>
         )}
 
-        {/* ── 탭 4: Mermaid 소스코드 ── */}
-        {activeTab === 'source' && (
+        {/* ── 탭 4: Mermaid / DBML 소스코드 ── */}
+        {(activeTab === 'source' || activeTab === 'dbml') && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
-                아래 코드를 <a href="https://mermaid.live" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}>mermaid.live</a> 또는
-                <a href="https://dbdiagram.io" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'underline', marginLeft: '4px' }}>dbdiagram.io</a>에 붙여넣기하면 편집할 수 있습니다.
+                {activeTab === 'source' ? (
+                  <>아래 코드를 <a href="https://mermaid.live" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}>mermaid.live</a>에 붙여넣기하면 편집할 수 있습니다.</>
+                ) : (
+                  <>아래 코드를 <a href="https://dbdiagram.io" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}>dbdiagram.io</a>에 붙여넣기하면 편집할 수 있습니다.</>
+                )}
               </p>
-              <button onClick={handleCopyMermaid} className="interactive" style={{
+              <button 
+                onClick={() => handleCopyCode(activeTab === 'source' ? result.mermaidCode : getDbmlCode())} 
+                className="interactive" style={{
                 padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--panel-border)',
                 background: copied ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.05)',
                 color: copied ? 'var(--success-color)' : 'var(--text-primary)',
@@ -385,7 +564,7 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
               fontSize: '13px', lineHeight: '1.7',
               color: '#a5d6ff', overflowX: 'auto', whiteSpace: 'pre'
             }}>
-              {result.mermaidCode}
+              {activeTab === 'source' ? result.mermaidCode : getDbmlCode()}
             </pre>
           </div>
         )}
