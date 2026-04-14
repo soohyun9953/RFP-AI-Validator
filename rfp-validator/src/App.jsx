@@ -8,7 +8,8 @@ import DocumentValidator from './components/DocumentValidator';
 import TypoValidator from './components/TypoValidator';
 import LawConsultant from './components/LawConsultant';
 import ErdGenerator from './components/ErdGenerator';
-import { Database } from 'lucide-react';
+import PptGenerator from './components/PptGenerator';
+import { Database, Presentation } from 'lucide-react';
 
 function App() {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
@@ -55,6 +56,8 @@ function App() {
             <Fingerprint size={36} color="var(--accent-blue)" />
           ) : activeMenu === 'erd' ? (
             <Database size={36} color="var(--accent-purple)" />
+          ) : activeMenu === 'ppt' ? (
+            <Presentation size={36} color="var(--accent-blue)" />
           ) : (
             <Library size={36} color="var(--accent-blue)" />
           )}
@@ -64,6 +67,7 @@ function App() {
                 : activeMenu === 'typo' ? 'AI 문서 품질/오탈자 점검' 
                 : activeMenu === 'law' ? 'AI 법률 자문 (MCP)' 
                 : activeMenu === 'erd' ? 'ERD 자동 설계'
+                : activeMenu === 'ppt' ? 'PPT 양식 자동 생성'
                 : activeMenu === 'reference' ? '참고 자료 관리'
                 : 'AI 법률 자문 (Gemini)'}
             </h1>
@@ -76,6 +80,8 @@ function App() {
                 ? '공공사업 PM 특화 - 소프트웨어 진흥법 및 국가계약법 실시간 자문'
                 : activeMenu === 'erd'
                 ? 'DB 설계 전문가 - 요구사항 기반 최적화된 논리 ERD 및 정규화 모델 도출'
+                : activeMenu === 'ppt'
+                ? '자동화 템플릿 - 액셀 데이터를 등록한 PPT 양식에 자동 매핑 및 대량 생성'
                 : activeMenu === 'reference'
                 ? '사용자 등록 문서 보관소 - AI 답변 및 검토의 객관적 근거가 되는 참고자료 관리'
                 : '지식 기반 자문 - Gemini의 내부 지식을 이용한 빠른 규정 검토'}
@@ -117,6 +123,9 @@ function App() {
           </div>
           <div className={`page-container ${activeMenu === 'erd' ? 'active' : 'inactive'}`}>
             <ErdGenerator apiKey={apiKey} />
+          </div>
+          <div className={`page-container ${activeMenu === 'ppt' ? 'active' : 'inactive'}`}>
+            <PptGenerator />
           </div>
           <div className={`page-container ${activeMenu === 'reference' ? 'active' : 'inactive'}`}>
             <ReferenceLibrary />
