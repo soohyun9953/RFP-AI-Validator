@@ -12,8 +12,8 @@ function TypoValidator({ apiKey }) {
   const [isInputMinimized, setIsInputMinimized] = useState(false);
   const lastParams = useRef(null);
 
-  const handleAnalyze = useCallback(async (ignoredGuideline, artifact, inspectionScope, glossary) => {
-    lastParams.current = { artifact, inspectionScope, glossary };
+  const handleAnalyze = useCallback(async (ignoredGuideline, artifact, inspectionScope, glossary, artifactFileName) => {
+    lastParams.current = { artifact, inspectionScope, glossary, artifactFileName };
     setIsAnalyzing(true);
     setResultData(null);
     setRetryStatus(null);
@@ -30,7 +30,7 @@ function TypoValidator({ apiKey }) {
           '', artifact, inspectionScope, apiKey, glossary,
           (status) => setRetryStatus(status)
         );
-        setResultData(result);
+        setResultData({ ...result, artifactFileName });
         setIsAnalyzing(false);
         setAnalysisStage(0);
         setRetryStatus(null);
@@ -67,8 +67,8 @@ function TypoValidator({ apiKey }) {
 
   const handleRetry = () => {
     if (lastParams.current) {
-        const { artifact, inspectionScope, glossary } = lastParams.current;
-        handleAnalyze('', artifact, inspectionScope, glossary);
+        const { artifact, inspectionScope, glossary, artifactFileName } = lastParams.current;
+        handleAnalyze('', artifact, inspectionScope, glossary, artifactFileName);
     }
   };
 

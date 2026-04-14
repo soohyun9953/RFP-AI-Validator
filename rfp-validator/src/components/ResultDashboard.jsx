@@ -131,7 +131,8 @@ async function exportToExcel(data, isTypoMode = false) {
 
     const now = new Date();
     const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
-    const fileName = isTypoMode ? `교정교열_결과_${dateStr}.xlsx` : `기준문서_검증결과_${dateStr}.xlsx`;
+    const filePrefix = data.artifactFileName ? `[${data.artifactFileName}]_` : '';
+    const fileName = isTypoMode ? `${filePrefix}교정교열_결과_${dateStr}.xlsx` : `${filePrefix}기준문서_검증결과_${dateStr}.xlsx`;
 
     try {
         const buffer = await wb.xlsx.writeBuffer();

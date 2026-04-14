@@ -14,8 +14,8 @@ function DocumentValidator({ apiKey }) {
   const [isInputMinimized, setIsInputMinimized] = useState(false);
   const lastParams = useRef(null);
 
-  const handleAnalyze = useCallback(async (guideline, artifact, inspectionScope, glossary) => {
-    lastParams.current = { guideline, artifact, inspectionScope, glossary };
+  const handleAnalyze = useCallback(async (guideline, artifact, inspectionScope, glossary, artifactFileName) => {
+    lastParams.current = { guideline, artifact, inspectionScope, glossary, artifactFileName };
     setIsAnalyzing(true);
     setResultData(null);
     setRetryStatus(null);
@@ -35,7 +35,7 @@ function DocumentValidator({ apiKey }) {
           guideline, artifact, inspectionScope, apiKey, glossary,
           (status) => setRetryStatus(status)
         );
-        setResultData(result);
+        setResultData({ ...result, artifactFileName });
         setIsAnalyzing(false);
         setAnalysisStage(0);
         setRetryStatus(null);
@@ -45,7 +45,7 @@ function DocumentValidator({ apiKey }) {
         setTimeout(() => {
           try {
             const result = analyzeDocuments(guideline, artifact, inspectionScope, glossary);
-            setResultData(result);
+            setResultData({ ...result, artifactFileName });
           } catch (e) {
             console.error('[DocumentValidator] 분석 오류:', e);
             setResultData({
@@ -81,8 +81,8 @@ function DocumentValidator({ apiKey }) {
 
   const handleRetry = () => {
     if (lastParams.current) {
-        const { guideline, artifact, inspectionScope, glossary } = lastParams.current;
-        handleAnalyze(guideline, artifact, inspectionScope, glossary);
+        const { guideline, artifact, inspectionScope, glossary, artifactFileName } = lastParams.current;
+        handleAnalyze(guideline, artifact, inspectionScope, glossary, artifactFileName);
     }
   };
 

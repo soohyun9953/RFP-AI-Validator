@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Scale, FileText, Settings, LayoutDashboard, PenTool, Library, ChevronLeft, ChevronRight, Fingerprint } from 'lucide-react';
+import { ShieldCheck, Scale, FileText, Settings, LayoutDashboard, PenTool, Library, ChevronLeft, ChevronRight, Fingerprint, Database } from 'lucide-react';
 
 function Sidebar({ activeMenu, setActiveMenu }) {
   const menuItems = [
@@ -7,6 +7,7 @@ function Sidebar({ activeMenu, setActiveMenu }) {
     { id: 'typo', label: 'AI 문서 품질/오탈자 점검', icon: <PenTool size={20} /> },
     { id: 'law_general', label: 'AI 법률 자문 (Gemini)', icon: <Scale size={20} /> },
     { id: 'law', label: 'AI 법률 자문 (MCP)', icon: <Fingerprint size={20} /> },
+    { id: 'erd', label: 'ERD 자동 설계', icon: <Database size={20} /> },
     { id: 'reference', label: '참고 자료 관리', icon: <Library size={20} /> },
   ];
 

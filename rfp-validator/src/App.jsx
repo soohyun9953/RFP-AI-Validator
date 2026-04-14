@@ -7,6 +7,8 @@ import Sidebar from './components/Sidebar';
 import DocumentValidator from './components/DocumentValidator';
 import TypoValidator from './components/TypoValidator';
 import LawConsultant from './components/LawConsultant';
+import ErdGenerator from './components/ErdGenerator';
+import { Database } from 'lucide-react';
 
 function App() {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
@@ -51,6 +53,8 @@ function App() {
             <PenTool size={36} color="var(--accent-blue)" />
           ) : activeMenu === 'law' || activeMenu === 'law_general' ? (
             <Fingerprint size={36} color="var(--accent-blue)" />
+          ) : activeMenu === 'erd' ? (
+            <Database size={36} color="var(--accent-purple)" />
           ) : (
             <Library size={36} color="var(--accent-blue)" />
           )}
@@ -59,6 +63,7 @@ function App() {
               {activeMenu === 'validator' ? 'AI 산출물 검증' 
                 : activeMenu === 'typo' ? 'AI 문서 품질/오탈자 점검' 
                 : activeMenu === 'law' ? 'AI 법률 자문 (MCP)' 
+                : activeMenu === 'erd' ? 'ERD 자동 설계'
                 : activeMenu === 'reference' ? '참고 자료 관리'
                 : 'AI 법률 자문 (Gemini)'}
             </h1>
@@ -69,6 +74,8 @@ function App() {
                 ? '교정교열 전문가 - 산출물 품질 점검 및 다층 로직/오탈자 검증'
                 : activeMenu === 'law'
                 ? '공공사업 PM 특화 - 소프트웨어 진흥법 및 국가계약법 실시간 자문'
+                : activeMenu === 'erd'
+                ? 'DB 설계 전문가 - 요구사항 기반 최적화된 논리 ERD 및 정규화 모델 도출'
                 : activeMenu === 'reference'
                 ? '사용자 등록 문서 보관소 - AI 답변 및 검토의 객관적 근거가 되는 참고자료 관리'
                 : '지식 기반 자문 - Gemini의 내부 지식을 이용한 빠른 규정 검토'}
@@ -107,6 +114,9 @@ function App() {
           </div>
           <div className={`page-container ${activeMenu === 'law_general' ? 'active' : 'inactive'}`}>
             <LawConsultant key="general-advisor" apiKey={apiKey} isMcpMode={false} />
+          </div>
+          <div className={`page-container ${activeMenu === 'erd' ? 'active' : 'inactive'}`}>
+            <ErdGenerator apiKey={apiKey} />
           </div>
           <div className={`page-container ${activeMenu === 'reference' ? 'active' : 'inactive'}`}>
             <ReferenceLibrary />

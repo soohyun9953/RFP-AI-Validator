@@ -490,7 +490,7 @@ export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = fals
 
             <button
                 className="primary interactive"
-                onClick={() => onAnalyze(guideline, artifact, inspectionScope, glossary)}
+                onClick={() => onAnalyze(guideline, artifact, inspectionScope, glossary, artifactFile)}
                 disabled={isAnalyzing || guidelineLoading || artifactLoading || glossaryLoading || ((!isTypoMode && !guideline && !artifact && !glossary) || (isTypoMode && !artifact))}
                 style={{
                     marginTop: '12px',
