@@ -234,9 +234,26 @@ export default function PptGenerator() {
                             )}
                         </div>
 
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                            💡 엑셀의 열 이름에 맞게 PPT 도형/텍스트 상자 내에 <code>{`{열이름}`}</code> 형태로 적어두세요. <br/>
-                            (예: 엑셀 1열 이름이 '사업명'이면 PPT에 <code>{`{사업명}`}</code> 추가)
+                        <div style={{ 
+                            fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.6', 
+                            marginTop: '4px', background: 'rgba(255,255,255,0.03)', 
+                            padding: '14px 18px', borderRadius: '8px', borderLeft: '3px solid var(--accent-blue)'
+                        }}>
+                            <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                💡 PPT 템플릿 매핑 및 대량 생성 원리
+                            </div>
+                            <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <li>
+                                    <strong>텍스트 자동 치환:</strong> PPT 내의 텍스트 상자나 도형 안에 <code>{`{엑셀 열 이름}`}</code> 형태로 태그를 적어두면, 엑셀 데이터로 글자가 자동 변환됩니다.
+                                </li>
+                                <li>
+                                    <strong>치환 예시:</strong> 엑셀 1번째 줄(헤더)에 <span style={{ color: 'var(--accent-purple)' }}>'사업명'</span>이라는 열이 있다면, PPT에는 <code>{`{사업명}`}</code>이라고 기입해 두세요.
+                                </li>
+                                <li>
+                                    <strong style={{ color: 'var(--success-color)' }}>슬라이드 대량 복제 (각 줄의 형태):</strong> 등록된 단 1장의 PPT 양식이, <strong>엑셀의 데이터 줄(행) 개수만큼 자동으로 복제</strong>됩니다.<br/>
+                                    (예시: 엑셀 데이터가 50줄이라면 ➡️ 각 줄의 데이터가 들어간 50장의 슬라이드로 구성된 완성본 PPT 1개가 생성됨)
+                                </li>
+                            </ul>
                         </div>
                     </div>
                 </div>

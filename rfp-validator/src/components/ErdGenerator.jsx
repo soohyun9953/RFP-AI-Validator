@@ -1,47 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Database, Download, FileText, Upload, Loader2, Play, CheckCircle2, AlertCircle, Info, Trash2, X, ChevronDown, Code2, BarChart3, BookOpen, Eye, Copy, Check, FileSpreadsheet } from 'lucide-react';
-import mermaid from 'mermaid';
 import * as XLSX from 'xlsx';
 import { analyzeERDWithLLM } from '../erdAnalyzer';
 import { processFile, ALL_ACCEPT } from '../utils/fileExtractor';
-
-// ── Mermaid 다이어그램 렌더러 ──────────────────────────────────
-const MermaidDiagram = ({ chart }) => {
-  const containerRef = useRef(null);
-
-  useEffect(() => {
-    if (chart && containerRef.current) {
-      mermaid.initialize({
-        startOnLoad: false,
-        theme: 'dark',
-        securityLevel: 'loose',
-        er: { useMaxWidth: true, fontSize: 14 }
-      });
-      const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
-      try {
-        mermaid.render(id, chart).then(({ svg }) => {
-          if (containerRef.current) containerRef.current.innerHTML = svg;
-        }).catch(e => {
-            console.error("Mermaid Render Error:", e);
-            if (containerRef.current)
-              containerRef.current.innerHTML = `<div style="color:var(--danger-color);padding:20px;display:flex;align-items:center;justify-content:center;height:100%;">다이어그램 렌더링에 실패했습니다. (Mermaid 소스 탭의 문법을 참조하세요)</div>`;
-        });
-      } catch (e) {
-        console.error("Mermaid Sync Error:", e);
-        if (containerRef.current)
-          containerRef.current.innerHTML = `<div style="color:var(--danger-color);padding:20px;display:flex;align-items:center;justify-content:center;height:100%;">다이어그램 렌더링에 실패했습니다.</div>`;
-      }
-    }
-  }, [chart]);
-
-  return (
-    <div ref={containerRef}
-      style={{ width: '100%', overflowX: 'auto', background: 'rgba(0,0,0,0.2)',
-        borderRadius: '12px', padding: '20px', display: 'flex',
-        justifyContent: 'center', minHeight: '300px' }}
-    />
-  );
-};
 
 // ── JSON 원문 뷰어 모달 ────────────────────────────────────────
 const JsonViewerModal = ({ data, onClose }) => {
@@ -155,14 +116,12 @@ const JsonViewerModal = ({ data, onClose }) => {
 
 // ── 결과 탭 뷰 ────────────────────────────────────────────────
 const ResultSection = ({ result, onOpenJsonViewer }) => {
-  const [activeTab, setActiveTab] = useState('diagram');
+  const [activeTab, setActiveTab] = useState('entities');
   const [copied, setCopied] = useState(false);
 
   const tabs = [
-    { id: 'diagram', label: 'ERD 다이어그램', icon: BarChart3 },
     { id: 'entities', label: '엔티티 & 속성 명세', icon: Database },
     { id: 'relations', label: '관계 & 정규화', icon: BookOpen },
-    { id: 'source', label: 'Mermaid 소스', icon: Code2 },
     { id: 'dbml', label: 'DBML 소스 (dbdiagram)', icon: Code2 },
   ];
 
@@ -306,12 +265,7 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
       '관계': result.normalizationNotes || ''
     });
 
-    // 4. Mermaid 소스코드 시트 데이터
-    const mermaidData = result.mermaidCode.split('\n').map(line => ({
-      'Mermaid 다이어그램 소스코드 (mermaid.live 에서 사용 가능)': line
-    }));
-
-    // 5. DBML 소스코드 시트 데이터
+    // 3. DBML 소스코드 시트 데이터
     const dbmlData = getDbmlCode().split('\n').map(line => ({
       'DBML 다이어그램 소스코드 (dbdiagram.io 에서 사용 가능)': line
     }));
@@ -321,7 +275,6 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(entityData), "엔티티정의서");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(attributeData), "속성정의서");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(relationData), "관계및정규화");
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(mermaidData), "Mermaid코드");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(dbmlData), "DBML코드");
     
     XLSX.writeFile(workbook, `ERD_상세설계서_${new Date().toISOString().split('T')[0]}.xlsx`);
@@ -396,20 +349,17 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
       {/* 탭 콘텐츠 */}
       <div style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
 
-        {/* ── 탭 1: ERD 다이어그램 ── */}
-        {activeTab === 'diagram' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <MermaidDiagram chart={result.mermaidCode} />
-            <div style={{
-              padding: '16px 20px', background: 'rgba(168,85,247,0.05)',
-              borderRadius: '12px', border: '1px solid rgba(168,85,247,0.15)',
-              fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.7'
-            }}>
-              <Info size={15} style={{ marginRight: '6px', verticalAlign: 'middle', color: 'var(--accent-purple)' }} />
-              <strong style={{ color: 'var(--text-primary)' }}>설계 요약:</strong> {result.summary}
-            </div>
+        {/* ── 탭 1: 상세 요약 ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+          <div style={{
+            padding: '16px 20px', background: 'rgba(168,85,247,0.05)',
+            borderRadius: '12px', border: '1px solid rgba(168,85,247,0.15)',
+            fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.7'
+          }}>
+            <Info size={15} style={{ marginRight: '6px', verticalAlign: 'middle', color: 'var(--accent-purple)' }} />
+            <strong style={{ color: 'var(--text-primary)' }}>설계 요약:</strong> {result.summary}
           </div>
-        )}
+        </div>
 
         {/* ── 탭 2: 엔티티 & 속성 명세 ── */}
         {activeTab === 'entities' && (
@@ -532,19 +482,15 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
           </div>
         )}
 
-        {/* ── 탭 4: Mermaid / DBML 소스코드 ── */}
-        {(activeTab === 'source' || activeTab === 'dbml') && (
+        {/* ── 탭 3: DBML 소스코드 ── */}
+        {activeTab === 'dbml' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
-                {activeTab === 'source' ? (
-                  <>아래 코드를 <a href="https://mermaid.live" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}>mermaid.live</a>에 붙여넣기하면 편집할 수 있습니다.</>
-                ) : (
-                  <>아래 코드를 <a href="https://dbdiagram.io" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}>dbdiagram.io</a>에 붙여넣기하면 편집할 수 있습니다.</>
-                )}
+                아래 코드를 <a href="https://dbdiagram.io" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}>dbdiagram.io</a>에 붙여넣기하면 편집할 수 있습니다.
               </p>
               <button 
-                onClick={() => handleCopyCode(activeTab === 'source' ? result.mermaidCode : getDbmlCode())} 
+                onClick={() => handleCopyCode(getDbmlCode())} 
                 className="interactive" style={{
                 padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--panel-border)',
                 background: copied ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.05)',
@@ -564,7 +510,7 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
               fontSize: '13px', lineHeight: '1.7',
               color: '#a5d6ff', overflowX: 'auto', whiteSpace: 'pre'
             }}>
-              {activeTab === 'source' ? result.mermaidCode : getDbmlCode()}
+              {getDbmlCode()}
             </pre>
           </div>
         )}
@@ -584,7 +530,40 @@ const ErdGenerator = ({ apiKey }) => {
   const [result, setResult] = useState(null);
   const [showJsonModal, setShowJsonModal] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [cooldown, setCooldown] = useState(0); 
   const fileInputRef = useRef(null);
+
+  // ── 쿨다운 로직 (로컬 스토리지 연동 및 타이머) ──
+  useEffect(() => {
+    // 마운트 시 로컬 스토리지에서 마지막 차단 시간 확인
+    const lastBlock = localStorage.getItem('erd_cooldown_expiry');
+    if (lastBlock) {
+      const remaining = Math.ceil((parseInt(lastBlock) - Date.now()) / 1000);
+      if (remaining > 0) setCooldown(remaining);
+    }
+  }, []);
+
+  useEffect(() => {
+    let timer;
+    if (cooldown > 0) {
+      timer = setInterval(() => {
+        setCooldown(prev => {
+          if (prev <= 1) {
+            localStorage.removeItem('erd_cooldown_expiry');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [cooldown]);
+
+  const startCooldown = (seconds) => {
+    const expiry = Date.now() + (seconds * 1000);
+    localStorage.setItem('erd_cooldown_expiry', expiry.toString());
+    setCooldown(seconds);
+  };
 
   // ── 드래그 앤 드롭 핸들러 ──
   const handleDragEnter = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
@@ -614,6 +593,9 @@ const ErdGenerator = ({ apiKey }) => {
   }, []);
 
   const handleAnalyze = async () => {
+    // 이미 분석 중이거나 쿨다운(대기) 중이면 중복 실행 방지
+    if (isAnalyzing || cooldown > 0) return;
+
     if (!inputText.trim()) {
       setError("분석할 요구사항 내용을 입력하거나 문서를 업로드해 주세요.");
       return;
@@ -626,6 +608,11 @@ const ErdGenerator = ({ apiKey }) => {
       setResult(data);
     } catch (err) {
       setError(err.message);
+      // 대소문자 관계없이 'quota', 'limit', 'exhausted' 키워드 체크
+      const lowerErr = err.message.toLowerCase();
+      if (lowerErr.includes("quota") || lowerErr.includes("limit") || lowerErr.includes("exhausted") || lowerErr.includes("429")) {
+        startCooldown(60);
+      }
     } finally {
       setIsAnalyzing(false);
     }
@@ -702,10 +689,31 @@ const ErdGenerator = ({ apiKey }) => {
           </div>
 
           <button className="interactive" onClick={handleAnalyze}
-            disabled={isAnalyzing || isLoading || !inputText.trim()}
-            style={{ width: '100%', padding: '16px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg, var(--accent-purple), var(--accent-blue))', color: 'white', fontWeight: 700, fontSize: '16px', cursor: 'pointer', boxShadow: '0 8px 20px rgba(168,85,247,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', opacity: (isAnalyzing || isLoading || !inputText.trim()) ? 0.6 : 1 }}>
-            {isAnalyzing ? <Loader2 size={20} className="animate-spin" /> : <Play size={20} fill="currentColor" />}
-            {isAnalyzing ? progressMsg || 'AI 분석 중...' : 'ERD 논리 모델 설계 시작'}
+            disabled={isAnalyzing || isLoading || !inputText.trim() || cooldown > 0}
+            style={{ 
+              width: '100%', padding: '16px', borderRadius: '12px', border: 'none', 
+              background: (isAnalyzing || isLoading || !inputText.trim() || cooldown > 0) 
+                ? 'rgba(255,255,255,0.05)' 
+                : 'linear-gradient(135deg, var(--accent-purple), var(--accent-blue))', 
+              color: (isAnalyzing || isLoading || !inputText.trim() || cooldown > 0) ? 'var(--text-muted)' : 'white', 
+              fontWeight: 700, fontSize: '16px', 
+              cursor: (isAnalyzing || isLoading || !inputText.trim() || cooldown > 0) ? 'not-allowed' : 'pointer', 
+              boxShadow: (isAnalyzing || isLoading || !inputText.trim() || cooldown > 0) ? 'none' : '0 8px 20px rgba(168,85,247,0.2)', 
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', 
+              transition: 'all 0.3s ease'
+            }}>
+            {isAnalyzing ? (
+              <Loader2 size={20} className="animate-spin" />
+            ) : cooldown > 0 ? (
+              <AlertCircle size={20} />
+            ) : (
+              <Play size={20} fill="currentColor" />
+            )}
+            {isAnalyzing 
+              ? progressMsg || 'AI 분석 중...' 
+              : cooldown > 0 
+                ? `서버 안정화 대기 중 (${cooldown}초)` 
+                : 'ERD 논리 모델 설계 시작'}
           </button>
         </div>
 
