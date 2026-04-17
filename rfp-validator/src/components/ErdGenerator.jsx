@@ -127,11 +127,25 @@ const MermaidDiagram = ({ chart }) => {
           setError(null);
           ref.current.innerHTML = '';
           
-          // 데이터 정제: 불필요한 이스케이프 문자 제거 (Mermaid 문법 오류 방지)
-          const cleanChart = chart
-            .replace(/\\"/g, '"') // \" -> "
-            .replace(/\\n/g, '\n') // \n -> 실제 개행
-            .replace(/\\\\/g, '\\'); // \\ -> \
+          // 데이터 정제: 불필요한 이스케이프 문자 및 마크다운 태그 제거
+          let cleanChart = chart
+            .replace(/```mermaid/g, '')
+            .replace(/```/g, '')
+            .replace(/\\n/g, '\n')
+            .replace(/\\"/g, '"')
+            .replace(/\\\\/g, '') // 모든 백슬래시 일괄 제거
+            .trim();
+
+          // erDiagram 키워드가 누락된 경우 자동 추가 시도
+          if (!cleanChart.startsWith('erDiagram')) {
+             if (cleanChart.includes('erDiagram')) {
+                cleanChart = cleanChart.substring(cleanChart.indexOf('erDiagram'));
+             } else {
+                // 정말 Mermaid 형식이 아니면 간단한 변환 시도 (필요시)
+                console.warn("Mermaid format might be incorrect, attempting to fix prefix.");
+                cleanChart = 'erDiagram\n' + cleanChart;
+             }
+          }
           
           mermaid.initialize({
             startOnLoad: false,
