@@ -39,7 +39,7 @@ export async function analyzeERDWithLLM(documentText, apiKey, onProgress, select
       "description": "<엔티티 한글 설명>",
       "reason": "<해당 엔티티 선정 사유>",
       "attributes": [
-        { "name": "<속성명>", "type": "<데이터타입>", "key": "<PK/FK/null>", "desc": "<속성 설명>" }
+        { "name": "<속성 한글명>", "type": "<데이터타입>", "key": "<PK/FK/null>", "desc": "<속성 상세설명>" }
       ]
     }
   ],
@@ -62,14 +62,16 @@ export async function analyzeERDWithLLM(documentText, apiKey, onProgress, select
 - 엔티티명이나 관계 설명에 공백이 있다면 반드시 " " (큰따옴표)로 감싸십시오.
 - 속성이 있는 경우 아래 형식을 따르십시오:
   'EntityName {
-    type name PK "설명"
+    type "한글속성명" PK "상세설명"
   }'
+- **중요**: 다이어그램 가독성을 위해 테이블 내 속성명은 가급적 **한글(논리명)**로 작성하십시오.
 - **코드 내에 어떤 경우에도 역슬래시(\\) 문자를 포함하지 마십시오.**
 - 관계 차수 기호(|o, o|, ||, }o, o{ 등)를 정확히 사용하십시오.
 
 [데이터 안정성 가이드]
-- **절대 주의**: JSON 내부의 모든 문자열값에서 실제 줄바꿈(raw newline)을 사용하지 마십시오. 줄바꿈이 필요한 경우 반드시 \\n 이스케이프 문자를 사용하십시오.
-- 모든 필드(특히 reason, normalizationNotes, summary)는 핵심 위주로 명확하고 간결하게 작성하여 전체 응답 길이를 최적화하십시오.
+- **절대 주의**: JSON 내부의 모든 문자열값(특히 mermaidCode, reason, summary 등)에서 실제 줄바꿈(raw newline)을 사용하지 마십시오. 줄바꿈이 필요한 경우 반드시 \\n (이스케이프 문자)을 사용하십시오.
+- **특수 문자 금지**: 엔티티명, 속성명, 설명 내에 역슬래시(\\), 줄바꿈, 탭 문자가 포함되지 않도록 하십시오.
+- 모든 필드는 핵심 위주로 명확하고 간결하게 작성하여 전체 응답 길이를 최적화하십시오.
 - 응답이 잘리지 않도록 최대 길이에 도달하기 전에 논리적으로 JSON을 마감하십시오.
 
 [주의사항]

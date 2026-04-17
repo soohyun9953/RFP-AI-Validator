@@ -131,9 +131,9 @@ const MermaidDiagram = ({ chart }) => {
           let cleanChart = chart
             .replace(/```mermaid/g, '')
             .replace(/```/g, '')
-            .replace(/\\n/g, '\n')
-            .replace(/\\"/g, '"')
-            .replace(/\\\\/g, '') // 모든 백슬래시 일괄 제거
+            .replace(/\\n/g, '\n') // literal \n -> 실제 개행
+            .replace(/\\"/g, '"')  // literal \" -> "
+            .replace(/\\/g, '')    // 남은 모든 단일 역슬래시(\) 제거
             .trim();
 
           // erDiagram 키워드가 누락된 경우 자동 추가 시도
@@ -227,7 +227,7 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
     if (!result || !result.entities) return '';
     let dbml = '';
     result.entities.forEach(entity => {
-      dbml += `Table "${entity.description || entity.name}" {\\n`;
+      dbml += `Table "${entity.description || entity.name}" {\n`;
       if (entity.attributes) {
         entity.attributes.forEach(attr => {
           let rawType = attr.type || '';
@@ -242,14 +242,14 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
             mods.push(`note: '${safeDesc}'`);
           }
           let modsStr = mods.length > 0 ? ` [${mods.join(', ')}]` : '';
-          dbml += `  "${attr.name}" ${pureType.toUpperCase()}${modsStr}\\n`;
+          dbml += `  "${attr.name}" ${pureType.toUpperCase()}${modsStr}\n`;
         });
       }
       if (entity.reason) {
-        const safeReason = entity.reason.replace(/\\\\n/g, ' ').replace(/\\n/g, ' ').replace(/'/g, "''").replace(/\\\\/g, '');
-        dbml += `  Note: '${safeReason}'\\n`;
+        const safeReason = entity.reason.replace(/\\n/g, ' ').replace(/'/g, "''").replace(/\\/g, '');
+        dbml += `  Note: '${safeReason}'\n`;
       }
-      dbml += `}\\n\\n`;
+      dbml += `}\n\n`;
     });
 
     if (result.relationships) {
@@ -266,8 +266,8 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
         if (rel.type.includes('1:N')) link = '<';
         if (rel.type.includes('N:M') || rel.type.includes('M:N')) link = '<>';
 
-        const safeRelDesc = (rel.desc || '').replace(/\\\\n/g, ' ').replace(/\\n/g, ' ').replace(/\\\\/g, '');
-        dbml += `Ref: "${fromName}"."${fromCol}" ${link} "${toName}"."${toCol}" // ${safeRelDesc}\\n`;
+        const safeRelDesc = (rel.desc || '').replace(/\\n/g, ' ').replace(/\\/g, '');
+        dbml += `Ref: "${fromName}"."${fromCol}" ${link} "${toName}"."${toCol}" // ${safeRelDesc}\n`;
       });
     }
     return dbml;
