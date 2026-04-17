@@ -52,8 +52,15 @@ export async function analyzeERDWithLLM(documentText, apiKey, onProgress, select
     }
   ],
   "normalizationNotes": "<정규화 준수 여부 및 반정규화 논거에 대한 상세 설명>",
-  "summary": "<전체 데이터 모델링 전략 및 설계 방향 요약>"
+  "summary": "<전체 데이터 모델링 전략 및 설계 방향 요약>",
+  "mermaidCode": "<erDiagram으로 시작하는 Mermaid.js 시각화 코드>"
 }
+
+[Mermaid 작성 가이드]
+- "erDiagram"으로 시작하십시오.
+- 엔티티 간의 관계는 "EntityA ||--o{ EntityB : relationship_desc" 형식을 사용하십시오.
+- 속성이 있는 경우 "Entity { type name PK/FK \"설명\" }" 형식을 따르되, **코드 내에 절대로 역슬래시(\) 문자를 포함하지 마십시오.**
+- 관계 차수(1:N 등)를 Mermaid 기호(|o, o|, ||, }o, o{ 등)로 정확히 표현하십시오.
 
 [주의사항]
 - 결과는 반드시 순수 JSON 형태여야 합니다.

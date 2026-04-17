@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Database, Download, FileText, Upload, Loader2, Play, CheckCircle2, AlertCircle, Info, Trash2, X, ChevronDown, Code2, BarChart3, BookOpen, Eye, Copy, Check, FileSpreadsheet } from 'lucide-react';
+import { Database, Download, FileText, Upload, Loader2, Play, CheckCircle2, AlertCircle, Info, Trash2, X, ChevronDown, Code2, BarChart3, BookOpen, Eye, Copy, Check, FileSpreadsheet, Maximize2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import mermaid from 'mermaid';
 import { analyzeERDWithLLM } from '../erdAnalyzer';
 import { processFile, ALL_ACCEPT } from '../utils/fileExtractor';
 
@@ -114,12 +115,95 @@ const JsonViewerModal = ({ data, onClose }) => {
   );
 };
 
+// ── Mermaid 다이어그램 렌더링 컴포넌트 ─────────────────────
+const MermaidDiagram = ({ chart }) => {
+  const ref = useRef(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (ref.current && chart) {
+      const renderChart = async () => {
+        try {
+          setError(null);
+          ref.current.innerHTML = '';
+          
+          // 데이터 정제: 불필요한 이스케이프 문자 제거 (Mermaid 문법 오류 방지)
+          const cleanChart = chart
+            .replace(/\\"/g, '"') // \" -> "
+            .replace(/\\n/g, '\n') // \n -> 실제 개행
+            .replace(/\\\\/g, '\\'); // \\ -> \
+          
+          mermaid.initialize({
+            startOnLoad: false,
+            theme: 'dark',
+            securityLevel: 'loose',
+            fontFamily: 'Inter, system-ui, sans-serif',
+            er: {
+              useMaxWidth: true,
+              fontSize: 14
+            }
+          });
+
+          const { svg } = await mermaid.render(`mermaid-${Math.random().toString(36).substr(2, 9)}`, cleanChart);
+          ref.current.innerHTML = svg;
+          
+          // SVG 스타일 조정
+          const svgEl = ref.current.querySelector('svg');
+          if (svgEl) {
+            svgEl.style.maxWidth = '100%';
+            svgEl.style.height = 'auto';
+            svgEl.style.display = 'block';
+            svgEl.style.margin = '0 auto';
+          }
+        } catch (e) {
+          console.error("Mermaid Render Error:", e);
+          setError(e.message);
+        }
+      };
+      renderChart();
+    }
+  }, [chart]);
+
+  if (error) {
+    return (
+      <div style={{
+        padding: '24px', borderRadius: '12px', background: 'rgba(239,68,68,0.05)',
+        border: '1px solid rgba(239,68,68,0.2)', color: 'var(--danger-color)',
+        fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '10px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}>
+          <AlertCircle size={16} /> 다이어그램 생성 실패
+        </div>
+        <p style={{ margin: 0, opacity: 0.8 }}>AI가 생성한 Mermaid 코드의 문법이 올바르지 않습니다.</p>
+        <pre style={{
+          margin: 0, padding: '12px', background: 'rgba(0,0,0,0.2)',
+          borderRadius: '8px', fontSize: '11px', overflowX: 'auto', color: 'var(--text-muted)'
+        }}>
+          {chart}
+        </pre>
+      </div>
+    );
+  }
+
+  return (
+    <div className="glass-panel" style={{
+      padding: '24px', background: 'rgba(255,255,255,0.02)',
+      borderRadius: '16px', border: '1px solid var(--panel-border)',
+      minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      overflow: 'auto'
+    }}>
+      <div ref={ref} style={{ width: '100%' }} />
+    </div>
+  );
+};
+
 // ── 결과 탭 뷰 ────────────────────────────────────────────────
 const ResultSection = ({ result, onOpenJsonViewer }) => {
   const [activeTab, setActiveTab] = useState('entities');
   const [copied, setCopied] = useState(false);
 
   const tabs = [
+    { id: 'diagram', label: '다이어그램 시각화', icon: Eye },
     { id: 'entities', label: '엔티티 & 속성 명세', icon: Database },
     { id: 'relations', label: '관계 & 정규화', icon: BookOpen },
     { id: 'dbml', label: 'DBML 소스 (dbdiagram)', icon: Code2 },
@@ -360,6 +444,21 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
             <strong style={{ color: 'var(--text-primary)' }}>설계 요약:</strong> {result.summary}
           </div>
         </div>
+
+        {/* ── 탭 0: 다이어그램 시각화 ── */}
+        {activeTab === 'diagram' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+               <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Eye size={16} color="var(--accent-purple)" /> ERD 다이어그램 (Mermaid)
+              </h4>
+              <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                * AI가 생성한 코드로 자동 렌더링한 논리 모델입니다.
+              </p>
+            </div>
+            <MermaidDiagram chart={result.mermaidCode} />
+          </div>
+        )}
 
         {/* ── 탭 2: 엔티티 & 속성 명세 ── */}
         {activeTab === 'entities' && (
