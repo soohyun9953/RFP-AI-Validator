@@ -383,11 +383,11 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
       {/* 탭 헤더 */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0px 24px', borderBottom: '1px solid var(--panel-border)',
-        background: 'rgba(0,0,0,0.2)', flexShrink: 0, gap: '16px'
+        padding: '12px 24px', borderBottom: '1px solid var(--panel-border)',
+        background: 'rgba(0,0,0,0.2)', flexShrink: 0, gap: '16px', flexWrap: 'wrap'
       }}>
         <div style={{ 
-          display: 'flex', overflowX: 'auto', flex: 1, 
+          display: 'flex', overflowX: 'auto', flex: 1, minWidth: '200px',
           msOverflowStyle: 'none', scrollbarWidth: 'none' 
         }} className="hide-scrollbar">
           <style>{`.hide-scrollbar::-webkit-scrollbar { display: none; }`}</style>
@@ -396,35 +396,35 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
             const isActive = activeTab === tab.id;
             return (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)} className="interactive" style={{
-                padding: '16px 20px', background: 'transparent',
+                padding: '12px 16px', background: 'transparent',
                 border: 'none', borderBottom: isActive ? '2px solid var(--accent-purple)' : '2px solid transparent',
                 color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
                 fontWeight: isActive ? 700 : 500, fontSize: '13px', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: '7px',
                 transition: 'all 0.2s', marginBottom: '-1px', whiteSpace: 'nowrap', flexShrink: 0
               }}>
-                <Icon size={15} color={isActive ? 'var(--accent-purple)' : 'inherit'} />
+                <Icon size={14} color={isActive ? 'var(--accent-purple)' : 'inherit'} />
                 {tab.label}
               </button>
             );
           })}
         </div>
-        <div style={{ display: 'flex', gap: '10px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: '8px', flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <button onClick={onOpenJsonViewer} className="interactive" style={{
-            padding: '8px 16px', borderRadius: '8px', border: '1px solid rgba(168,85,247,0.3)',
+            padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(168,85,247,0.3)',
             background: 'rgba(168,85,247,0.08)', color: 'var(--accent-purple)',
-            fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+            fontSize: '12px', fontWeight: 600, cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap'
           }}>
-            <Eye size={14} /> JSON 원문 보기
+            <Eye size={13} /> <span className="mobile-hide-text">JSON 원문 보기</span><span style={{ display: 'none' }} className="mobile-only-show">JSON</span>
           </button>
           <button onClick={handleExportExcel} className="interactive" style={{
-            padding: '8px 16px', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.3)',
+            padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.3)',
             background: 'rgba(16,185,129,0.08)', color: 'var(--success-color)',
-            fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+            fontSize: '12px', fontWeight: 600, cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap'
           }}>
-            <FileSpreadsheet size={14} /> 엑셀 저장
+            <FileSpreadsheet size={13} /> <span className="mobile-hide-text">엑셀 저장</span><span style={{ display: 'none' }} className="mobile-only-show">Excel</span>
           </button>
           <button onClick={() => {
             const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' });
@@ -434,12 +434,12 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
             a.download = `ERD_Design_${new Date().toISOString().split('T')[0]}.json`;
             a.click();
           }} className="interactive" style={{
-            padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--panel-border)',
+            padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--panel-border)',
             background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)',
-            fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+            fontSize: '12px', fontWeight: 600, cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap'
           }}>
-            <Download size={14} /> JSON 저장
+            <Download size={13} /> <span className="mobile-hide-text">JSON 저장</span>
           </button>
         </div>
       </div>

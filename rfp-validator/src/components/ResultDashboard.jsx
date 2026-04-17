@@ -190,18 +190,18 @@ export default function ResultDashboard({ data, isTypoMode = false, onRetry }) {
                     </div>
                 </div>
 
-                <div className="glass-panel animate-slide-up stagger-1" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '120px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'nowrap' }}>
+                <div className="glass-panel animate-slide-up stagger-1" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '100px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
                         <ShieldAlert size={20} color={data.summary && (data.summary.includes('실패') || data.summary.includes('소진')) ? 'var(--danger-color)' : 'var(--warning-color)'} style={{ flexShrink: 0 }} />
-                        <h3 style={{ margin: 0, fontSize: '18px', flex: 1, whiteSpace: 'nowrap', minWidth: 'fit-content' }}>종합 평가 보고서</h3>
-                        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                        <h3 style={{ margin: 0, fontSize: '18px', flex: '1 1 200px', whiteSpace: 'normal' }}>종합 평가 보고서</h3>
+                        <div style={{ display: 'flex', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
                             {data.summary && (data.summary.includes('실패') || data.summary.includes('소진')) && onRetry && (
                                 <button
                                     onClick={onRetry}
                                     className="interactive pulse-text"
                                     style={{
                                         display: 'flex', alignItems: 'center', gap: '8px',
-                                        padding: '10px 18px', fontSize: '14px', fontWeight: 700,
+                                        padding: '8px 14px', fontSize: '13px', fontWeight: 700,
                                         background: 'rgba(59, 130, 246, 0.15)',
                                         color: 'var(--accent-blue)',
                                         border: '2px solid var(--accent-blue)',
@@ -209,8 +209,8 @@ export default function ResultDashboard({ data, isTypoMode = false, onRetry }) {
                                         cursor: 'pointer',
                                     }}
                                 >
-                                    <RotateCcw size={18} />
-                                    지금 다시 시도
+                                    <RotateCcw size={16} />
+                                    <span className="mobile-hide-text">지금 다시 시도</span><span className="mobile-only-show" style={{ display: 'none' }}>재시도</span>
                                 </button>
                             )}
                             <button
@@ -218,7 +218,7 @@ export default function ResultDashboard({ data, isTypoMode = false, onRetry }) {
                                 className="interactive"
                                 style={{
                                     display: 'flex', alignItems: 'center', gap: '8px',
-                                    padding: '10px 18px', fontSize: '14px', fontWeight: 600,
+                                    padding: '8px 14px', fontSize: '13px', fontWeight: 600,
                                     background: 'rgba(34, 197, 94, 0.1)',
                                     color: 'var(--success-color)',
                                     border: '1px solid rgba(34, 197, 94, 0.2)',
@@ -226,8 +226,8 @@ export default function ResultDashboard({ data, isTypoMode = false, onRetry }) {
                                     cursor: 'pointer',
                                 }}
                             >
-                                <Download size={18} />
-                                보고서 내보내기
+                                <Download size={16} />
+                                <span className="mobile-hide-text">보고서 내보내기</span><span className="mobile-only-show" style={{ display: 'none' }}>다운로드</span>
                             </button>
                         </div>
                     </div>
@@ -410,7 +410,7 @@ export default function ResultDashboard({ data, isTypoMode = false, onRetry }) {
 
                                     {/* 매핑 정보 2열 그리드 */}
                                     <div style={{
-                                        display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px',
+                                        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px',
                                         fontSize: '13px', marginBottom: '14px',
                                     }}>
                                         <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '6px' }}>
