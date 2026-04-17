@@ -15,7 +15,7 @@ export default function PptGenerator() {
     const [successMsg, setSuccessMsg] = useState(null);
     
     // Options
-    const [generationMode, setGenerationMode] = useState('chunk'); // 'chunk' or 'multiple'
+    const [generationMode, setGenerationMode] = useState('single'); // 'single', 'chunk', or 'multiple'
     const [chunkSize, setChunkSize] = useState(10); // 한 슬라이드(표)에 들어갈 기본 행 개수
 
     const [isDraggingExcel, setIsDraggingExcel] = useState(false);
@@ -282,6 +282,20 @@ export default function PptGenerator() {
                         <h4 style={{ margin: 0, fontSize: '15px' }}>생성 (Export) 방침 선택</h4>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', opacity: generationMode === 'single' ? 1 : 0.6 }}>
+                            <input 
+                                type="radio" 
+                                name="mode" 
+                                checked={generationMode === 'single'} 
+                                onChange={() => setGenerationMode('single')}
+                                style={{ marginTop: '3px' }}
+                            />
+                            <div>
+                                <strong style={{ display: 'block', fontSize: '14px', marginBottom: '4px', color: generationMode === 'single' ? 'var(--accent-blue)' : 'inherit' }}>단일 파일 통합 생성 (추천)</strong>
+                                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>모든 데이터를 하나의 PPT 파일 내에 각각의 슬라이드로 복제하여 생성합니다. (ZIP 압축 없음)</span>
+                            </div>
+                        </label>
+                        <div style={{ height: '1px', background: 'rgba(255,255,255,0.05)', margin: '4px 0' }} />
                         <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', opacity: generationMode === 'chunk' ? 1 : 0.6 }}>
                             <input 
                                 type="radio" 
@@ -291,8 +305,8 @@ export default function PptGenerator() {
                                 style={{ marginTop: '3px' }}
                             />
                             <div>
-                                <strong style={{ display: 'block', fontSize: '14px', marginBottom: '4px', color: generationMode === 'chunk' ? 'var(--accent-blue)' : 'inherit' }}>지정 행(Row) 분할 표 생성 (추천)</strong>
-                                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>엑셀 데이터를 아래 설정한 개수만큼 잘라서 표에 채운 여러 장의 PPT를 생성 후 압축(.zip) 제공합니다.</span>
+                                <strong style={{ display: 'block', fontSize: '14px', marginBottom: '4px', color: generationMode === 'chunk' ? 'var(--accent-blue)' : 'inherit' }}>지정 행(Row) 분할 표 생성</strong>
+                                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>엑셀 데이터를 설정한 개수만큼 잘라서 표에 채운 여러 개의 PPT를 생성 후 압축(.zip) 제공합니다.</span>
                                 
                                 {generationMode === 'chunk' && (
                                     <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.2)', padding: '8px 12px', borderRadius: '6px' }}>
