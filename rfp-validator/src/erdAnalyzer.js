@@ -58,14 +58,12 @@ export async function analyzeERDWithLLM(documentText, apiKey, onProgress, select
 
 [Mermaid 작성 가이드]
 - **erDiagram**으로 시작하십시오. (**절대로 Table { ... } 같은 DBML 형식을 섞지 마십시오.**)
-- 엔티티 간의 관계는 `EntityA ||--o{ EntityB : "관련성"` 형식을 사용하십시오.
-- 엔티티명이나 관계 설명에 공백이 있다면 반드시 `" "` (큰따옴표)로 감싸십시오.
+- 엔티티 간의 관계는 'EntityA ||--o{ EntityB : "관련성"' 형식을 사용하십시오.
+- 엔티티명이나 관계 설명에 공백이 있다면 반드시 " " (큰따옴표)로 감싸십시오.
 - 속성이 있는 경우 아래 형식을 따르십시오:
-  ```
-  EntityName {
+  'EntityName {
     type name PK "설명"
-  }
-  ```
+  }'
 - **코드 내에 어떤 경우에도 역슬래시(\\) 문자를 포함하지 마십시오.**
 - 관계 차수 기호(|o, o|, ||, }o, o{ 등)를 정확히 사용하십시오.
 
