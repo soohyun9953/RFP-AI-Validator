@@ -243,9 +243,9 @@ export default function PptGenerator() {
                                 💡 PPT 템플릿 매핑 가이드
                             </div>
                             <p style={{ margin: 0 }}>
-                                PPT 내 텍스트 상자에 <code>{`{열이름}`}</code> 정해진 규칙대로 입력하면 엑셀 데이터가 매핑됩니다.<br/>
-                                <strong>예순번 예시:</strong> <code>{`{사업명_1}`}</code>, <code>{`{사업명_2}`}</code> ... <code>{`{사업명_10}`}</code><br/>
-                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>* 엑셀 행 개수만큼 슬라이드가 자동 복제되어 생성됩니다.</span>
+                                PPT 내 텍스트 상자에 <code>{`{열이름}`}</code> (예: <code>{`{성명}`}</code>, <code>{`{부서}`}</code>) 형식으로 입력하세요.<br/>
+                                <strong style={{ color: 'var(--accent-blue)' }}>* 자동 슬라이드 복제:</strong> 엑셀 행 개수만큼 슬라이드가 자동으로 생성되며 각 행의 데이터가 각 슬라이드에 채워집니다.
+                                <br/><span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>(기존 방식인 {`{항목_1}`} 형식도 여전히 호환됩니다.)</span>
                             </p>
                         </div>
                     </div>
@@ -276,71 +276,18 @@ export default function PptGenerator() {
                 )}
 
                 {/* 생성 옵션 패널 */}
-                <div style={{ padding: '20px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--panel-border)', borderRadius: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                        <Settings size={18} color="var(--text-secondary)" />
-                        <h4 style={{ margin: 0, fontSize: '15px' }}>생성 (Export) 방침 선택</h4>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', opacity: generationMode === 'single' ? 1 : 0.6 }}>
-                            <input 
-                                type="radio" 
-                                name="mode" 
-                                checked={generationMode === 'single'} 
-                                onChange={() => setGenerationMode('single')}
-                                style={{ marginTop: '3px' }}
-                            />
-                            <div>
-                                <strong style={{ display: 'block', fontSize: '14px', marginBottom: '4px', color: generationMode === 'single' ? 'var(--accent-blue)' : 'inherit' }}>단일 파일 통합 생성 (추천)</strong>
-                                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>모든 데이터를 하나의 PPT 파일 내에 각각의 슬라이드로 복제하여 생성합니다. (ZIP 압축 없음)</span>
-                            </div>
-                        </label>
-                        <div style={{ height: '1px', background: 'rgba(255,255,255,0.05)', margin: '4px 0' }} />
-                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', opacity: generationMode === 'chunk' ? 1 : 0.6 }}>
-                            <input 
-                                type="radio" 
-                                name="mode" 
-                                checked={generationMode === 'chunk'} 
-                                onChange={() => setGenerationMode('chunk')}
-                                style={{ marginTop: '3px' }}
-                            />
-                            <div>
-                                <strong style={{ display: 'block', fontSize: '14px', marginBottom: '4px', color: generationMode === 'chunk' ? 'var(--accent-blue)' : 'inherit' }}>지정 행(Row) 분할 표 생성</strong>
-                                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>엑셀 데이터를 설정한 개수만큼 잘라서 표에 채운 여러 개의 PPT를 생성 후 압축(.zip) 제공합니다.</span>
-                                
-                                {generationMode === 'chunk' && (
-                                    <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.2)', padding: '8px 12px', borderRadius: '6px' }}>
-                                        <span style={{ fontSize: '13px', color: 'var(--text-primary)' }}>1개의 PPT 파일에 들어갈 표의 행 개수:</span>
-                                        <input 
-                                            type="number" 
-                                            min="1" 
-                                            max="100" 
-                                            value={chunkSize} 
-                                            onChange={e => setChunkSize(parseInt(e.target.value) || 1)}
-                                            style={{ 
-                                                width: '60px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--panel-border)', 
-                                                background: 'var(--bg-dark)', color: 'var(--text-primary)', outline: 'none'
-                                            }}
-                                        />
-                                        <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>개</span>
-                                    </div>
-                                )}
-                            </div>
-                        </label>
-                        <div style={{ height: '1px', background: 'rgba(255,255,255,0.05)', margin: '4px 0' }} />
-                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', opacity: generationMode === 'multiple' ? 1 : 0.6 }}>
-                            <input 
-                                type="radio" 
-                                name="mode" 
-                                checked={generationMode === 'multiple'} 
-                                onChange={() => setGenerationMode('multiple')}
-                                style={{ marginTop: '3px' }}
-                            />
-                            <div>
-                                <strong style={{ display: 'block', fontSize: '14px', marginBottom: '4px' }}>개별 파일 분리 다운로드 (행 1개당 PPT 1개)</strong>
-                                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>엑셀 데이터 행(Row) 개수만큼 모두 개별 독립된 PPT 파일들이 무한 생성됩니다. <br/>(수료증, 개별 보고서, 이력서, 개별 이슈 카드용)</span>
-                            </div>
-                        </label>
+                <div style={{ padding: '20px', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Settings size={18} color="var(--accent-blue)" />
+                            <h4 style={{ margin: 0, fontSize: '15.5px', color: 'var(--text-primary)' }}>생성 옵션: 단일 파일 통합 생성 (지능형 자동 인식)</h4>
+                        </div>
+                        
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(59, 130, 246, 0.1)', padding: '10px 18px', borderRadius: '10px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                            <span style={{ fontSize: '13.5px', color: 'var(--text-primary)', fontWeight: 600 }}>
+                                💡 템플릿의 표 구조(인덱스 태그)를 분석하여 자동으로 행 개수를 설정합니다.
+                            </span>
+                        </div>
                     </div>
                 </div>
 
