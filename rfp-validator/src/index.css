@@ -164,33 +164,37 @@ body {
 }
 
 .sidebar-toggle-btn {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.08);
   border: 1px solid var(--glass-border);
-  color: var(--text-muted);
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+  color: var(--text-secondary);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .sidebar-toggle-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-primary);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(168, 85, 247, 0.1);
+  color: var(--accent-purple);
+  border-color: rgba(168, 85, 247, 0.4);
+  box-shadow: 0 0 15px rgba(168, 85, 247, 0.2);
+  transform: scale(1.05);
 }
 
 .sidebar.collapsed .sidebar-toggle-btn {
   position: absolute;
   top: 30px;
-  right: -14px;
+  right: -16px;
   z-index: 101;
   background: var(--bg-secondary);
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  border: 1px solid var(--accent-purple);
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.3), 0 4px 12px rgba(0,0,0,0.5);
+  color: var(--accent-purple);
 }
 
 

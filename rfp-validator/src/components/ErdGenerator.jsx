@@ -520,7 +520,7 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
 };
 
 // ── 메인 ErdGenerator 컴포넌트 ────────────────────────────────
-const ErdGenerator = ({ apiKey, selectedModel }) => {
+const ErdGenerator = ({ apiKey }) => {
   const [inputText, setInputText] = useState('');
   const [fileName, setFileName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -605,7 +605,7 @@ const ErdGenerator = ({ apiKey, selectedModel }) => {
     setIsAnalyzing(true);
     setResult(null);
     try {
-      const data = await analyzeERDWithLLM(inputText, apiKey, (msg) => setProgressMsg(msg), selectedModel);
+      const data = await analyzeERDWithLLM(inputText, apiKey, (msg) => setProgressMsg(msg), 'auto');
       setResult(data);
     } catch (err) {
       setError(err.message);

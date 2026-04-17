@@ -4,7 +4,7 @@ import InputSection from './InputSection';
 import ResultDashboard from './ResultDashboard';
 import { analyzeDocumentsWithLLM } from '../llmAnalyzer';
 
-function DocumentValidator({ apiKey, selectedModel }) {
+function DocumentValidator({ apiKey }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisStage, setAnalysisStage] = useState(0); // 1: 추출, 2: 심층분석
   const [retryStatus, setRetryStatus] = useState(null); // API 재시도 상태 메시지
@@ -29,7 +29,7 @@ function DocumentValidator({ apiKey, selectedModel }) {
         const result = await analyzeDocumentsWithLLM(
           guideline, artifact, inspectionScope, apiKey, glossary,
           (status) => setRetryStatus(status),
-          selectedModel
+          'auto'
         );
         setResultData({ ...result, artifactFileName });
       } else {

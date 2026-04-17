@@ -32,7 +32,6 @@ import { processFile } from './utils/fileExtractor';
 function App() {
   const [activeTab, setActiveTab] = useState('main');
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
-  const [selectedModel, setSelectedModel] = useState(() => localStorage.getItem('selected_model') || 'auto');
   const [modelUsage, setModelUsage] = useState(() => JSON.parse(localStorage.getItem('gemini_model_usage') || '{}'));
   const [showSettings, setShowSettings] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -49,9 +48,7 @@ function App() {
   }, [apiKey]);
 
 
-  useEffect(() => {
-    localStorage.setItem('selected_model', selectedModel);
-  }, [selectedModel]);
+
 
   // 사용량 업데이트 이벤트 리스너
   useEffect(() => {
@@ -98,7 +95,7 @@ function App() {
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             title={isSidebarCollapsed ? "펼치기" : "접기"}
           >
-            {isSidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+            {isSidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
           </button>
 
           <button className="mobile-close" onClick={() => setIsMobileMenuOpen(false)}>
@@ -129,22 +126,7 @@ function App() {
           })}
         </nav>
 
-        <div className="sidebar-footer">
-            <div className="quota-card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>가용 API 키</span>
-                    <span style={{ fontSize: '12px', fontWeight: 700, color: keyCount > 0 ? 'var(--success-color)' : 'var(--danger-color)' }}>
-                        {keyCount}개 연결됨
-                    </span>
-                </div>
-                <div className="quota-bar">
-                    <div className="quota-fill" style={{ width: `${Math.min(keyCount * 25, 100)}%`, backgroundColor: keyCount > 1 ? 'var(--success-color)' : 'var(--warning-color)' }}></div>
-                </div>
-                <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '8px', lineHeight: '1.4' }}>
-                    {keyCount > 1 ? '멀티 키 로테이션이 활성화되었습니다. 할당량을 자동 관리합니다.' : 'API 키를 콤마(,)로 구분하여 추가 등록하면 할당량 문제를 예방할 수 있습니다.'}
-                </p>
-            </div>
-        </div>
+
       </aside>
 
       {/* Main Content */}
@@ -162,7 +144,24 @@ function App() {
           </div>
 
           <div className="header-right">
+            {/* API Status Badge */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginRight: '8px', padding: '4px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: '8px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.3px' }}>API Multi-Key</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: keyCount > 0 ? 'var(--success-color)' : 'var(--danger-color)' }}>
+                  {keyCount} Keys Connected
+                </span>
+              </div>
+              <div style={{ width: '32px', height: '3px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+                <div style={{ width: `${Math.min(keyCount * 25, 100)}%`, height: '100%', backgroundColor: keyCount > 1 ? 'var(--success-color)' : 'var(--warning-color)' }}></div>
+              </div>
+            </div>
 
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', marginRight: '8px' }}>
+              <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>Last Update</span>
+              <span style={{ fontSize: '12px', color: 'var(--accent-blue)', fontWeight: 700, fontFamily: 'monospace' }}>2026. 04. 17</span>
+            </div>
+            
             <button 
               className={`settings-btn ${showSettings ? 'active' : ''}`} 
               onClick={() => setShowSettings(!showSettings)}
@@ -197,23 +196,7 @@ function App() {
                   <p className="helper-text">할당량 초과 시 자동으로 다음 키로 전환됩니다.</p>
                 </div>
 
-                <div className="divider"></div>
 
-                <div className="setting-group">
-                  <label>
-                    <Cpu size={14} /> 분석 모델 선택
-                  </label>
-                  <select 
-                    value={selectedModel} 
-                    onChange={(e) => setSelectedModel(e.target.value)}
-                    className="model-select"
-                  >
-                    <option value="models/gemini-3-flash-preview">Gemini 3 Flash (최신 프리뷰)</option>
-                    <option value="models/gemini-2.0-flash">Gemini 2.0 Flash (속도 최상)</option>
-                    <option value="models/gemini-1.5-flash-latest">Gemini 1.5 Flash (안정적)</option>
-                    <option value="models/gemini-1.5-pro-latest">Gemini 1.5 Pro (높은 품질)</option>
-                  </select>
-                </div>
 
                 <div className="setting-group usage-section">
                   <label>
@@ -249,11 +232,11 @@ function App() {
         </header>
 
         <div className="content-body">
-          {activeTab === 'main' && <DocumentValidator apiKey={apiKey} selectedModel={selectedModel} />}
-          {activeTab === 'typo' && <TypoValidator apiKey={apiKey} selectedModel={selectedModel} />}
-          {activeTab === 'law' && <LawConsultant apiKey={apiKey} selectedModel={selectedModel} isMcpMode={false} />}
-          {activeTab === 'law-mcp' && <LawConsultant apiKey={apiKey} selectedModel={selectedModel} isMcpMode={true} />}
-          {activeTab === 'erd' && <ErdGenerator apiKey={apiKey} selectedModel={selectedModel} />}
+          {activeTab === 'main' && <DocumentValidator apiKey={apiKey} />}
+          {activeTab === 'typo' && <TypoValidator apiKey={apiKey} />}
+          {activeTab === 'law' && <LawConsultant apiKey={apiKey} isMcpMode={false} />}
+          {activeTab === 'law-mcp' && <LawConsultant apiKey={apiKey} isMcpMode={true} />}
+          {activeTab === 'erd' && <ErdGenerator apiKey={apiKey} />}
           {activeTab === 'ppt' && <PptGenerator apiKey={apiKey} />}
           {activeTab === 'library' && <ReferenceLibrary />}
         </div>

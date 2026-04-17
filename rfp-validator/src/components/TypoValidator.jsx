@@ -4,7 +4,7 @@ import InputSection from './InputSection';
 import ResultDashboard from './ResultDashboard';
 import { analyzeDocumentsWithLLM } from '../llmAnalyzer';
 
-function TypoValidator({ apiKey, selectedModel }) {
+function TypoValidator({ apiKey }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisStage, setAnalysisStage] = useState(0); // 1: 추출, 2: 심층분석
   const [retryStatus, setRetryStatus] = useState(null); // API 재시도 상태 메시지
@@ -27,7 +27,7 @@ function TypoValidator({ apiKey, selectedModel }) {
         const result = await analyzeDocumentsWithLLM(
           '', artifact, inspectionScope, apiKey, glossary,
           (status) => setRetryStatus(status),
-          selectedModel
+          'auto'
         );
         setResultData({ ...result, artifactFileName });
       } else {
