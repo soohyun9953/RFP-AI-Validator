@@ -520,7 +520,7 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
 };
 
 // ── 메인 ErdGenerator 컴포넌트 ────────────────────────────────
-const ErdGenerator = ({ apiKey }) => {
+const ErdGenerator = ({ apiKey, selectedModel }) => {
   const [inputText, setInputText] = useState('');
   const [fileName, setFileName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -593,9 +593,10 @@ const ErdGenerator = ({ apiKey }) => {
   }, []);
 
   const handleAnalyze = async () => {
-    // 이미 분석 중이거나 쿨다운(대기) 중이면 중복 실행 방지
-    if (isAnalyzing || cooldown > 0) return;
-
+    if (!apiKey || !apiKey.startsWith('AIza')) {
+      alert('Gemini API 키가 필요합니다. 상단 설정 메뉴에서 API 키를 입력해 주세요.');
+      return;
+    }
     if (!inputText.trim()) {
       setError("분석할 요구사항 내용을 입력하거나 문서를 업로드해 주세요.");
       return;
@@ -604,7 +605,7 @@ const ErdGenerator = ({ apiKey }) => {
     setIsAnalyzing(true);
     setResult(null);
     try {
-      const data = await analyzeERDWithLLM(inputText, apiKey, (msg) => setProgressMsg(msg));
+      const data = await analyzeERDWithLLM(inputText, apiKey, (msg) => setProgressMsg(msg), selectedModel);
       setResult(data);
     } catch (err) {
       setError(err.message);
@@ -627,14 +628,14 @@ const ErdGenerator = ({ apiKey }) => {
 
   return (
     <>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '20px', overflowY: 'auto', paddingRight: '8px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
         {/* ── 입력 섹션 ── */}
         <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Database size={20} color="var(--accent-purple)" />
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700 }}>비즈니스 요구사항 입력</h3>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700 }}>AI 데이터베이스(ERD) 설계</h3>
             </div>
             {(inputText || fileName) && (
               <button onClick={handleReset} className="interactive"

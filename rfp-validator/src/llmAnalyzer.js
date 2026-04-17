@@ -1,10 +1,24 @@
-export async function analyzeDocumentsWithLLM(guidelineText, artifactText, inspectionScope, apiKey, glossaryText, onProgress) {
-    if (!apiKey) {
-        throw new Error("API 키가 제공되지 않았습니다.");
+export async function analyzeDocumentsWithLLM(guidelineText, artifactText, inspectionScope, apiKey, glossaryText, onProgress, selectedModel = 'auto') {
+    const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.startsWith('AIza'));
+    if (keys.length === 0) {
+        throw new Error("유효한 API 키가 제공되지 않았습니다.");
     }
 
+    let currentKeyIndex = 0;
     const isOnlyTypoCheck = !guidelineText || guidelineText.trim() === '';
     
+    // 사용량 기록 유틸리티
+    const recordUsage = (modelName) => {
+        try {
+            const usage = JSON.parse(localStorage.getItem('gemini_model_usage') || '{}');
+            usage[modelName] = (usage[modelName] || 0) + 1;
+            localStorage.setItem('gemini_model_usage', JSON.stringify(usage));
+            window.dispatchEvent(new CustomEvent('gemini_usage_updated'));
+        } catch (e) {
+            console.error("Usage recording failed:", e);
+        }
+    };
+
     let systemPrompt = '';
     if (onProgress) onProgress("분석 프롬프트 구성 중...");
     if (isOnlyTypoCheck) {
@@ -92,9 +106,6 @@ export async function analyzeDocumentsWithLLM(guidelineText, artifactText, inspe
 } `;
     }
 
-
-
-
     const userInput = isOnlyTypoCheck ? `
 [시스템 지시사항]
 ${systemPrompt}
@@ -122,102 +133,97 @@ ${(artifactText || '').substring(0, 2000000)}
 ${inspectionScope || '없음'}
 `;
 
-
     try {
-        let targetModel = "models/gemini-3.0-flash";
-        try {
-            const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-            if (listRes.ok) {
-                const listData = await listRes.json();
-                if (listData && listData.models) {
-                    const validModels = listData.models.filter(m => 
-                        m.supportedGenerationMethods?.includes('generateContent') && 
-                        m.name.includes('gemini')
-                    );
-                    if (validModels.length > 0) {
-                        const flash3x = validModels.find(m => m.name.includes('gemini-3') && m.name.includes('flash'));
-                        const flash20 = validModels.find(m => m.name.includes('gemini-2.0-flash'));
-                        const flash15 = validModels.find(m => m.name.includes('gemini-1.5-flash'));
-                        if (flash3x) targetModel = flash3x.name;
-                        else if (flash20) targetModel = flash20.name;
-                        else if (flash15) targetModel = flash15.name;
-                        else targetModel = validModels[0].name;
-                    }
-                }
-            }
-        } catch(err) {
-            console.warn("모델 탐색 실패 (Fallback 모델 사용):", err);
-        }
+        const FALLBACK_MODELS = [
+            "models/gemini-2.0-flash",
+            "models/gemini-3-flash-preview",
+            "models/gemini-1.5-flash-latest",
+            "models/gemini-1.5-pro-latest"
+        ];
+        
+        let initialModel = selectedModel && selectedModel !== 'auto' ? selectedModel : FALLBACK_MODELS[0];
+        if (!initialModel.startsWith('models/')) initialModel = `models/${initialModel}`;
+        
+        let currentModelIndex = FALLBACK_MODELS.indexOf(initialModel);
+        if (currentModelIndex === -1) currentModelIndex = 0;
 
-        const fetchUrl = `https://generativelanguage.googleapis.com/v1beta/${targetModel.startsWith('models/') ? targetModel : `models/${targetModel}`}:generateContent?key=${apiKey}`;
-
-        const fetchOptions = {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                contents: [{
-                    role: "user",
-                    parts: [{ text: userInput }]
-                }],
-                generationConfig: {
-                    temperature: 0.1
-                }
-            })
-        };
-
-        // 재시도 로직이 포함된 fetch 호출
-        const fetchWithRetry = async (url, options, maxRetries = 5) => {
-            let retries = 0;
-            while (retries < maxRetries) {
-                if (onProgress && retries === 0) onProgress("Gemini 서버에 분석 요청 중...");
-                const response = await fetch(url, options);
+        const fetchWithRetry = async (maxModelRetries = 3) => {
+            let modelRetries = 0;
+            
+            while (modelRetries < maxModelRetries) {
+                const activeKey = keys[currentKeyIndex];
+                const modelId = FALLBACK_MODELS[currentModelIndex];
+                const fetchUrl = `https://generativelanguage.googleapis.com/v1beta/${modelId}:generateContent?key=${activeKey}`;
                 
-                if (response.ok) return response;
+                const fetchOptions = {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{ role: "user", parts: [{ text: userInput }] }],
+                        generationConfig: { temperature: 0.1 }
+                    })
+                };
+
+                if (onProgress) {
+                    const keyInfo = keys.length > 1 ? ` (키 ${currentKeyIndex + 1}/${keys.length} 사용 중)` : '';
+                    onProgress(`${modelId.split('/').pop()} 모델로 분석 요청 중...${keyInfo}`);
+                }
+
+                const response = await fetch(fetchUrl, fetchOptions);
                 
-                // 429: Too Many Requests (Quota Exceeded)
+                if (response.ok) {
+                    recordUsage(modelId); // 사용량 기록
+                    return response;
+                }
+                
                 if (response.status === 429) {
-                    const baseWait = Math.pow(2, retries) * 3000;
-                    const jitter = Math.random() * 2000;
-                    const waitTime = baseWait + jitter; // 3s, 6s, 12s, 24s, 48s...
+                    // 1. 다음 API 키로 즉시 시도
+                    if (keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
+                        currentKeyIndex++;
+                        if (onProgress) onProgress(`현재 키 할당량 초과... 다음 키로 교체 시도 중 (${currentKeyIndex + 1}/${keys.length})`);
+                        continue;
+                    }
+
+                    // 2. 모든 키가 소진된 경우 -> 5초 대기 후 모델 변경
+                    modelRetries++;
+                    if (modelRetries < maxModelRetries) {
+                        currentKeyIndex = 0; // 새 모델은 첫 번째 키부터 다시
+                        const nextModelIndex = (currentModelIndex + 1) % FALLBACK_MODELS.length;
+                        const nextModelName = FALLBACK_MODELS[nextModelIndex].split('/').pop();
+                        
+                        if (onProgress) onProgress(`모든 API 할당량 초과... 5초 후 모델을 [${nextModelName}]으로 변경하여 재시도합니다.`);
+                        
+                        await new Promise(resolve => setTimeout(resolve, 5000));
+                        currentModelIndex = nextModelIndex;
+                        continue;
+                    }
                     
-                    const waitSec = Math.round(waitTime / 1000);
-                    console.warn(`[Gemini API] 할당량 초과. ${waitSec}초 후 재시도합니다... (시도 ${retries + 1}/${maxRetries})`);
-                    
-                    if (onProgress) onProgress(`API 할당량 초과... ${waitSec}초 후 자동 재시도 예정 (시도 ${retries + 1}/${maxRetries})`);
-                    
-                    await new Promise(resolve => setTimeout(resolve, waitTime));
-                    retries++;
-                    continue;
+                    throw new Error("모든 API 키와 모델의 사용 한도가 소진되었습니다.");
                 }
                 
                 const err = await response.json();
                 throw new Error(err.error?.message || response.statusText);
             }
-            throw new Error("현재 Gemini API 무료 티어의 할당량이 일시적으로 소진되었습니다. 약 1~2분 정도 대기하신 후 다시 [분석 시작]을 눌러주세요.");
+            throw new Error("모든 API 키의 사용 한도가 소진되었습니다.");
         };
 
-        const response = await fetchWithRetry(fetchUrl, fetchOptions);
+        const response = await fetchWithRetry();
         const data = await response.json();
         let content = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
 
         if (content.includes("```")) {
             const match = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-            if (match && match[1]) {
-                content = match[1];
-            }
+            if (match && match[1]) content = match[1];
         }
 
         const parsed = JSON.parse(content);
 
-        // LLM 토큰 절약을 위해 생략한 rtm과 omissions 필드를 JS에서 동기화하여 자동 생성
         if (parsed.requirementMapping && Array.isArray(parsed.requirementMapping)) {
             if (!parsed.rtm) {
                 parsed.rtm = parsed.requirementMapping.map(req => ({
                     type: req.type || '필수',
                     requirement: req.requirement || '-',
-                    status: req.status || '미이행(X)',  // 이행(O), 부분 이행(△), 미이행(X)
+                    status: req.status || '미이행(X)',
                     location: req.artifactSection || '해당 없음',
                     category: req.category || '-',
                     levelLabel: req.levelLabel || '개별문장'
@@ -244,10 +250,7 @@ ${inspectionScope || '없음'}
         return parsed;
     } catch (e) {
         console.error("Gemini API Error:", e);
-        if (e.message.includes("quota")) {
-            throw new Error("Gemini API 할당량이 초과되었습니다. 무료 티어의 경우 분당 요청 횟수가 제한될 수 있으니 잠시 후(약 1분 뒤) 다시 시도해 주세요.");
-        }
+        if (e.message.includes("quota")) throw new Error("Gemini API 할당량이 초과되었습니다.");
         throw new Error(`Gemini 검증 실패: ${e.message}`);
     }
 }
-

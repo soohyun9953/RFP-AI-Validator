@@ -121,8 +121,8 @@ export default function PptGenerator() {
     const columns = excelDataPreview && excelDataPreview.length > 0 ? Object.keys(excelDataPreview[0]) : [];
 
     return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div className="glass-panel animate-slide-up" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', flex: 1, overflowY: 'auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div className="glass-panel animate-slide-up" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 
                 {/* 헤더 */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid var(--panel-border)', paddingBottom: '16px' }}>
@@ -130,7 +130,7 @@ export default function PptGenerator() {
                         <Presentation size={24} color="var(--accent-blue)" />
                     </div>
                     <div>
-                        <h2 style={{ margin: 0, fontSize: '20px', color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>PPT 양식 자동 생성기</h2>
+                        <h2 style={{ margin: 0, fontSize: '20px', color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>PPT 생성 (엑셀기준)</h2>
                         <p style={{ margin: '4px 0 0', fontSize: '13.5px', color: 'var(--text-secondary)' }}>
                             작성된 엑셀 데이터를 지정한 파워포인트(.pptx) 양식 파일에 자동으로 채워 넣습니다.
                         </p>
@@ -240,20 +240,13 @@ export default function PptGenerator() {
                             padding: '14px 18px', borderRadius: '8px', borderLeft: '3px solid var(--accent-blue)'
                         }}>
                             <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                💡 PPT 템플릿 매핑 및 대량 생성 원리
+                                💡 PPT 템플릿 매핑 가이드
                             </div>
-                            <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                <li>
-                                    <strong>텍스트 자동 치환:</strong> PPT 내의 텍스트 상자나 도형 안에 <code>{`{엑셀 열 이름}`}</code> 형태로 태그를 적어두면, 엑셀 데이터로 글자가 자동 변환됩니다.
-                                </li>
-                                <li>
-                                    <strong>치환 예시:</strong> 엑셀 1번째 줄(헤더)에 <span style={{ color: 'var(--accent-purple)' }}>'사업명'</span>이라는 열이 있다면, PPT에는 <code>{`{사업명}`}</code>이라고 기입해 두세요.
-                                </li>
-                                <li>
-                                    <strong style={{ color: 'var(--success-color)' }}>슬라이드 대량 복제 (각 줄의 형태):</strong> 등록된 단 1장의 PPT 양식이, <strong>엑셀의 데이터 줄(행) 개수만큼 자동으로 복제</strong>됩니다.<br/>
-                                    (예시: 엑셀 데이터가 50줄이라면 ➡️ 각 줄의 데이터가 들어간 50장의 슬라이드로 구성된 완성본 PPT 1개가 생성됨)
-                                </li>
-                            </ul>
+                            <p style={{ margin: 0 }}>
+                                PPT 내 텍스트 상자에 <code>{`{열이름}`}</code> 정해진 규칙대로 입력하면 엑셀 데이터가 매핑됩니다.<br/>
+                                <strong>예순번 예시:</strong> <code>{`{사업명_1}`}</code>, <code>{`{사업명_2}`}</code> ... <code>{`{사업명_10}`}</code><br/>
+                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>* 엑셀 행 개수만큼 슬라이드가 자동 복제되어 생성됩니다.</span>
+                            </p>
                         </div>
                     </div>
                 </div>

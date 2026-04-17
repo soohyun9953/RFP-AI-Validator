@@ -4,12 +4,11 @@ import InputSection from './InputSection';
 import ResultDashboard from './ResultDashboard';
 import { analyzeDocumentsWithLLM } from '../llmAnalyzer';
 
-function TypoValidator({ apiKey }) {
+function TypoValidator({ apiKey, selectedModel }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisStage, setAnalysisStage] = useState(0); // 1: 추출, 2: 심층분석
   const [retryStatus, setRetryStatus] = useState(null); // API 재시도 상태 메시지
   const [resultData, setResultData] = useState(null);
-  const [isInputMinimized, setIsInputMinimized] = useState(false);
   const lastParams = useRef(null);
 
   const handleAnalyze = useCallback(async (ignoredGuideline, artifact, inspectionScope, glossary, artifactFileName) => {
@@ -18,7 +17,6 @@ function TypoValidator({ apiKey }) {
     setResultData(null);
     setRetryStatus(null);
     setAnalysisStage(1);
-    setIsInputMinimized(true);
 
     // 시각적 연출을 위한 인위적 지연 (UX 목적)
     await new Promise(resolve => setTimeout(resolve, 2500));
@@ -28,28 +26,15 @@ function TypoValidator({ apiKey }) {
       if (apiKey && apiKey.startsWith('AIza')) {
         const result = await analyzeDocumentsWithLLM(
           '', artifact, inspectionScope, apiKey, glossary,
-          (status) => setRetryStatus(status)
+          (status) => setRetryStatus(status),
+          selectedModel
         );
         setResultData({ ...result, artifactFileName });
-        setIsAnalyzing(false);
-        setAnalysisStage(0);
-        setRetryStatus(null);
       } else {
-        setIsAnalyzing(false);
-        setAnalysisStage(0);
-        setRetryStatus(null);
-        setResultData({
-            score: 0,
-            inspectionScope: inspectionScope || null,
-            summary: `오탈자 점검은 LLM 전용 기능입니다. API Key를 올바르게 입력해주세요.`,
-            rtm: [],
-            requirementMapping: [],
-            omissions: [],
-            typos: [],
-        });
+        throw new Error('유효한 Gemini API Key가 필요합니다. 상단 설정 메뉴에서 API Key를 입력해 주세요.');
       }
     } catch (e) {
-        console.error('[TypoValidator] LLM 분석 오류:', e);
+        console.error('[TypoValidator] 교정교열 오류:', e);
         setResultData({
             score: 0,
             inspectionScope: inspectionScope || null,
@@ -59,6 +44,7 @@ function TypoValidator({ apiKey }) {
             omissions: [],
             typos: [],
         });
+    } finally {
         setIsAnalyzing(false);
         setAnalysisStage(0);
         setRetryStatus(null);

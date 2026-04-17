@@ -65,8 +65,8 @@ function FileUploadArea({ label, icon: Icon, fileName, onFileSelect, onFileClear
     return (
         <div
             style={{
-                display: 'flex', flexDirection: 'column', flex: 1, gap: '8px',
-                position: 'relative',
+                display: 'flex', flexDirection: 'column', flex: 1, gap: '12px',
+                position: 'relative', minHeight: 0, width: '100%',
             }}
             onDragEnter={handleDragEnter}
             onDragOver={handleDragOver}
@@ -181,7 +181,12 @@ function FileUploadArea({ label, icon: Icon, fileName, onFileSelect, onFileClear
                     placeholder={placeholder}
                     value={textValue}
                     onChange={e => onTextChange(e.target.value)}
-                    style={{ flex: 1, resize: 'none', lineHeight: '1.5', width: '100%' }}
+                    style={{ 
+                        flex: 1, resize: 'none', lineHeight: '1.6', width: '100%',
+                        background: 'rgba(0, 0, 0, 0.2)', color: 'var(--text-primary)',
+                        border: '1px solid var(--glass-border)', borderRadius: '12px',
+                        padding: '16px', outline: 'none'
+                    }}
                 />
                 {/* 드래그 오버레이 */}
                 {isDragging && (
@@ -215,7 +220,7 @@ function FileUploadArea({ label, icon: Icon, fileName, onFileSelect, onFileClear
 }
 
 // ── 메인 InputSection ──────────────────────────────────────
-export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = false, onReset, isMinimized, onToggleMinimize }) {
+export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = false, onReset }) {
     const [activeTab, setActiveTab] = useState(isTypoMode ? 1 : 0);
     const [guideline, setGuideline] = useState('');
     const [artifact, setArtifact] = useState('');
@@ -280,36 +285,15 @@ export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = fals
     };
 
     // ── 최소화 모드 렌더링 ──────────────────────────────────
-    if (isMinimized) {
-        return (
-            <div className="glass-panel animate-fade-in" style={{
-                width: '60px', display: 'flex', flexDirection: 'column', alignItems: 'center',
-                padding: '24px 0', gap: '30px', transition: 'width 0.3s ease', cursor: 'pointer'
-            }} onClick={onToggleMinimize}>
-                <button 
-                  className="interactive" 
-                  style={{ 
-                    background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', 
-                    borderRadius: '8px', padding: '8px', color: 'var(--accent-blue)', cursor: 'pointer' 
-                  }}
-                >
-                    <ChevronRight size={18} />
-                </button>
-                <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontSize: '14px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '4px', opacity: 0.5, whiteSpace: 'nowrap' }}>
-                    DATA INPUT SECTION
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="glass-panel animate-fade-in" style={{
             flex: 1, display: 'flex', flexDirection: 'column',
-            padding: '24px', gap: '20px',
-            minWidth: '400px',
+            padding: '28px', gap: '24px',
+            minWidth: '450px', height: '100%',
             cursor: isAnalyzing ? 'wait' : 'default',
             transition: 'all 0.3s ease',
-            overflow: 'hidden'
+            overflow: 'hidden', position: 'relative'
         }}>
             <div style={{
                 display: 'flex', alignItems: 'center', gap: '8px',
@@ -343,28 +327,6 @@ export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = fals
                     <X size={14} /> 초기화
                 </button>
 
-                <button
-                    onClick={onToggleMinimize}
-                    title="입력 영역 접기"
-                    className="interactive"
-                    style={{
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid var(--panel-border)',
-                        padding: '6px 12px',
-                        borderRadius: '8px',
-                        color: 'var(--text-secondary)',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        marginLeft: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        whiteSpace: 'nowrap'
-                    }}
-                >
-                    <ChevronLeft size={16} /> 접기
-                </button>
 
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     {['PDF', 'Excel', 'PPTX', 'HWPX', 'TXT'].map((ext, idx) => {
@@ -381,7 +343,10 @@ export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = fals
             </div>
 
             {/* 탭 헤더 */}
-            <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--panel-border)', paddingBottom: '8px', marginBottom: '8px' }}>
+            <div style={{ 
+                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', 
+                borderBottom: '1px solid var(--glass-border)', paddingBottom: '12px', marginBottom: '8px' 
+            }}>
                 {(isTypoMode ? [
                     { id: 1, label: '1. 검증 대상 문서', icon: FileText, hasData: !!artifact || !!artifactFile },
                     { id: 2, label: '2. 용어 사전', icon: FileSpreadsheet, hasData: !!glossary || !!glossaryFile },
@@ -395,20 +360,25 @@ export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = fals
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
                         style={{
-                            flex: 1, padding: '12px 0',
-                            background: activeTab === tab.id ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-                            border: '1px solid', borderColor: activeTab === tab.id ? 'var(--accent-color)' : 'transparent',
-                            borderRadius: '8px',
-                            color: activeTab === tab.id ? 'var(--accent-color)' : 'var(--text-secondary)',
-                            fontWeight: activeTab === tab.id ? 600 : 500, cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                            transition: 'all 0.2s', fontSize: '13px', position: 'relative',
-                            whiteSpace: 'nowrap'
+                            padding: '10px 4px',
+                            background: activeTab === tab.id ? 'rgba(59, 130, 246, 0.12)' : 'rgba(255, 255, 255, 0.02)',
+                            border: '1px solid', borderColor: activeTab === tab.id ? 'var(--accent-blue)' : 'var(--glass-border)',
+                            borderRadius: '10px',
+                            color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-secondary)',
+                            fontWeight: activeTab === tab.id ? 700 : 500, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)', fontSize: '12px', position: 'relative',
                         }}
                     >
-                        <tab.icon size={16} />
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{tab.label}</span>
-                        {tab.hasData && <span style={{ position: 'absolute', top: '8px', right: '8px', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--success-color)' }} />}
+                        <tab.icon size={14} />
+                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tab.label}</span>
+                        {tab.hasData && (
+                            <div style={{ 
+                                width: '6px', height: '6px', borderRadius: '50%', 
+                                background: 'var(--success-color)', marginLeft: '4px',
+                                boxShadow: '0 0 6px var(--success-color)'
+                            }} />
+                        )}
                     </button>
                 ))}
             </div>
@@ -482,7 +452,12 @@ export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = fals
                             placeholder="예시: CSR-011 요구사항 항목만을 중심으로 집중 점검하세요. 목차 일관성보다 문장 간 논리성에 더 큰 가중치를 두어 검사해주세요."
                             value={inspectionScope}
                             onChange={e => setInspectionScope(e.target.value)}
-                            style={{ flex: 1, resize: 'none', lineHeight: '1.6', fontSize: '15px' }}
+                            style={{ 
+                                flex: 1, resize: 'none', lineHeight: '1.6', fontSize: '15px',
+                                background: 'rgba(0, 0, 0, 0.2)', color: 'var(--text-primary)',
+                                border: '1px solid var(--glass-border)', borderRadius: '12px',
+                                padding: '16px', outline: 'none'
+                            }}
                         />
                     </div>
                 )}

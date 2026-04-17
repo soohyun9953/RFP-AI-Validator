@@ -28,8 +28,6 @@ async function callLexGuardMcp(query) {
     }
 
     const text = await response.text();
-    // Parse SSE chunk
-    // Expected format: data: {"jsonrpc": "2.0", ...}\n\n
     const lines = text.split('\n');
     for (const line of lines) {
       if (line.startsWith('data: ')) {
@@ -41,7 +39,7 @@ async function callLexGuardMcp(query) {
         }
       }
     }
-    return { error: "답변에서 유효한 데이터(SSE Stream)를 파싱하지 못했습니다." };
+    return { error: "답변에서 유효한 데이터를 파싱하지 못했습니다." };
   } catch (err) {
     console.error("MCP Call Error:", err);
     return { error: err.message };
@@ -100,59 +98,77 @@ export async function askLawAssistant(query, apiKey, history = [], onMcpCall = n
     ]
   }];
 
-  // 가용 모델 탐색 및 선택 로직 (llmAnalyzer와 동일하게 구현)
-  let targetModel = "models/gemini-2.0-flash"; // 기본값
-  try {
-    const listRes = await fetch(`${GEMINI_BASE_URL}/models?key=${apiKey}`);
-    if (listRes.ok) {
-        const listData = await listRes.json();
-        if (listData && listData.models) {
-            const validModels = listData.models.filter(m => 
-                m.supportedGenerationMethods?.includes('generateContent') && 
-                m.name.includes('gemini')
-            );
-            if (validModels.length > 0) {
-                const flash3x = validModels.find(m => m.name.includes('gemini-3') && m.name.includes('flash'));
-                const flash20 = validModels.find(m => m.name.includes('gemini-2.0-flash'));
-                const flash15 = validModels.find(m => m.name.includes('gemini-1.5-flash'));
-                if (flash3x) targetModel = flash3x.name;
-                else if (flash20) targetModel = flash20.name;
-                else if (flash15) targetModel = flash15.name;
-                else targetModel = validModels[0].name;
-            }
-        }
-    }
-  } catch(err) {
-    console.warn("모델 탐색 실패 (Fallback 모델 사용):", err);
+  const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.startsWith('AIza'));
+  if (keys.length === 0) {
+    throw new Error("유효한 Gemini API Key가 필요합니다.");
   }
 
-  const modelId = targetModel.startsWith('models/') ? targetModel : `models/${targetModel}`;
-  const fetchUrl = `${GEMINI_BASE_URL}/${modelId}:generateContent?key=${apiKey}`;
+  const FALLBACK_MODELS = [
+    "models/gemini-2.0-flash",
+    "models/gemini-3-flash-preview",
+    "models/gemini-1.5-flash-latest",
+    "models/gemini-1.5-pro-latest"
+  ];
 
-  const generateContent = async (reqContents) => {
-    const payload = {
-      systemInstruction: { parts: [{ text: systemInstruction }] },
-      contents: reqContents,
-      tools: tools,
-      generationConfig: { temperature: 0.1, topK: 40, topP: 0.95 }
-    };
+  let currentKeyIndex = 0;
+  let currentModelIndex = 0;
 
-    const response = await fetch(fetchUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+  const generateWithRetry = async (reqContents, useTools = true) => {
+    let modelRetries = 0;
+    const maxModelRetries = FALLBACK_MODELS.length;
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error?.message || `API 요청 실패 (${response.status})`);
+    while (modelRetries < maxModelRetries) {
+      const activeKey = keys[currentKeyIndex];
+      const modelId = FALLBACK_MODELS[currentModelIndex];
+      const fetchUrl = `${GEMINI_BASE_URL}/${modelId}:generateContent?key=${activeKey}`;
+
+      const payload = {
+        systemInstruction: { parts: [{ text: systemInstruction }] },
+        contents: reqContents,
+        tools: useTools ? tools : undefined,
+        generationConfig: { temperature: 0.1, topK: 40, topP: 0.95 }
+      };
+
+      try {
+        const response = await fetch(fetchUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (response.ok) {
+          return await response.json();
+        }
+
+        if (response.status === 429) {
+          // 1. 키 로테이션
+          if (keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
+            currentKeyIndex++;
+            continue;
+          }
+
+          // 2. 모델 폴백
+          modelRetries++;
+          if (modelRetries < maxModelRetries) {
+            currentKeyIndex = 0;
+            currentModelIndex = (currentModelIndex + 1) % FALLBACK_MODELS.length;
+            await new Promise(r => setTimeout(r, 2000)); // 짧은 대기
+            continue;
+          }
+        }
+
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || `API 요청 실패 (${response.status})`);
+      } catch (err) {
+        if (modelRetries >= maxModelRetries - 1) throw err;
+        modelRetries++;
+        currentModelIndex = (currentModelIndex + 1) % FALLBACK_MODELS.length;
+      }
     }
-
-    return await response.json();
   };
 
   try {
-    let data = await generateContent(contents);
+    let data = await generateWithRetry(contents);
     let candidate = data.candidates && data.candidates[0];
 
     if (!candidate) throw new Error("API 응답에서 결과를 찾을 수 없습니다.");
@@ -183,7 +199,7 @@ export async function askLawAssistant(query, apiKey, history = [], onMcpCall = n
       });
 
       // 2차 생성 요청 (최종 답변 생성)
-      data = await generateContent(contents);
+      data = await generateWithRetry(contents);
       candidate = data.candidates && data.candidates[0];
       if (!candidate) throw new Error("API 응답(2차)에서 결과를 찾을 수 없습니다.");
       
@@ -193,26 +209,13 @@ export async function askLawAssistant(query, apiKey, history = [], onMcpCall = n
       
       // 2차에서도 텍스트가 없으면(또다시 functionCall 시도 등) tools 없이 3차 요청으로 강제 텍스트 응답 유도
       if (!extractedText) {
-        const fallbackPayload = {
-          systemInstruction: { parts: [{ text: systemInstruction }] },
-          contents: [...contents, candidate.content, {
-            role: 'user',
-            parts: [{ text: '위 조회 결과를 바탕으로 질문에 대한 답변을 한국어로 작성해 주세요.' }]
-          }],
-          generationConfig: { temperature: 0.2, topK: 40, topP: 0.95 }
-          // tools 제거: 텍스트만 강제 생성
-        };
-        const fallbackResponse = await fetch(fetchUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(fallbackPayload),
-        });
-        if (fallbackResponse.ok) {
-          const fallbackData = await fallbackResponse.json();
-          const fallbackCandidate = fallbackData.candidates && fallbackData.candidates[0];
-          if (fallbackCandidate) {
-            return fallbackCandidate.content.parts.map(p => p.text || '').join('').trim() || '답변을 생성하지 못했습니다. 다른 키워드로 다시 질문해 주세요.';
-          }
+        data = await generateWithRetry([...contents, candidate.content, {
+          role: 'user',
+          parts: [{ text: '위 조회 결과를 바탕으로 질문에 대한 답변을 한국어로 작성해 주세요.' }]
+        }], false);
+        candidate = data.candidates && data.candidates[0];
+        if (candidate) {
+          return candidate.content.parts.map(p => p.text || '').join('').trim() || '답변을 생성하지 못했습니다.';
         }
       }
       
@@ -242,22 +245,60 @@ export async function askGeneralLawAssistant(query, apiKey, history = []) {
 3. 법령명은 「」으로 감싸고 전문적인 어조를 유지하세요.
   `;
 
-  let targetModel = "models/gemini-2.0-flash";
-  try {
-    const listRes = await fetch(`${GEMINI_BASE_URL}/models?key=${apiKey}`);
-    if (listRes.ok) {
-        const listData = await listRes.json();
-        const validModels = listData.models.filter(m => m.supportedGenerationMethods?.includes('generateContent') && m.name.includes('gemini'));
-        if (validModels.length > 0) {
-            const flash3x = validModels.find(m => m.name.includes('gemini-3') && m.name.includes('flash'));
-            const flash20 = validModels.find(m => m.name.includes('gemini-2.0-flash'));
-            const flash15 = validModels.find(m => m.name.includes('gemini-1.5-flash'));
-            targetModel = (flash3x || flash20 || flash15 || validModels[0]).name;
-        }
-    }
-  } catch(e) {}
+  const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.startsWith('AIza'));
+  if (keys.length === 0) throw new Error("유효한 Gemini API Key가 필요합니다.");
 
-  const modelId = targetModel.startsWith('models/') ? targetModel : `models/${targetModel}`;
+  const FALLBACK_MODELS = [
+    "models/gemini-2.0-flash",
+    "models/gemini-3-flash-preview",
+    "models/gemini-1.5-flash-latest",
+    "models/gemini-1.5-pro-latest"
+  ];
+
+  let currentKeyIndex = 0;
+  let currentModelIndex = 0;
+
+  const generateWithRetry = async (reqContents) => {
+    let modelRetries = 0;
+    while (modelRetries < FALLBACK_MODELS.length) {
+      const activeKey = keys[currentKeyIndex];
+      const modelId = FALLBACK_MODELS[currentModelIndex];
+      
+      try {
+        const response = await fetch(`${GEMINI_BASE_URL}/${modelId}:generateContent?key=${activeKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemInstruction }] },
+            contents: reqContents,
+            generationConfig: { temperature: 0.2 }
+          }),
+        });
+
+        if (response.ok) return await response.json();
+
+        if (response.status === 429) {
+          if (keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
+            currentKeyIndex++;
+            continue;
+          }
+          modelRetries++;
+          if (modelRetries < FALLBACK_MODELS.length) {
+            currentKeyIndex = 0;
+            currentModelIndex++;
+            await new Promise(r => setTimeout(r, 2000));
+            continue;
+          }
+        }
+        const errData = await response.json();
+        throw new Error(errData.error?.message || `API 요청 실패 (${response.status})`);
+      } catch (err) {
+        if (modelRetries >= FALLBACK_MODELS.length - 1) throw err;
+        modelRetries++;
+        currentModelIndex++;
+      }
+    }
+  };
   
   // Gemini API는 첫 번째 메시지가 'user'여야 하고, 역할이 번갈아 나와야 함.
   // 인사말(model)이 먼저 나오는 히스토리를 고려하여 필터링 함.
@@ -284,20 +325,6 @@ export async function askGeneralLawAssistant(query, apiKey, history = []) {
       contents.push({ role: 'user', parts: [{ text: query }] });
   }
 
-  const response = await fetch(`${GEMINI_BASE_URL}/${modelId}:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemInstruction }] },
-      contents,
-      generationConfig: { temperature: 0.2 }
-    }),
-  });
-
-  if (!response.ok) {
-    const errData = await response.json();
-    throw new Error(errData.error?.message || `API 요청 실패 (${response.status})`);
-  }
-  const data = await response.json();
+  const data = await generateWithRetry(contents);
   return data.candidates?.[0]?.content?.parts?.[0]?.text || "답변을 생성할 수 없습니다.";
 }

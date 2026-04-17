@@ -1,7 +1,22 @@
-export async function analyzeERDWithLLM(documentText, apiKey, onProgress) {
-    if (!apiKey) {
-        throw new Error("API 키가 제공되지 않았습니다.");
+export async function analyzeERDWithLLM(documentText, apiKey, onProgress, selectedModel = 'auto') {
+    const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.startsWith('AIza'));
+    if (keys.length === 0) {
+        throw new Error("유효한 API 키가 제공되지 않았습니다.");
     }
+
+    let currentKeyIndex = 0;
+
+    // 사용량 기록 유틸리티
+    const recordUsage = (modelName) => {
+        try {
+            const usage = JSON.parse(localStorage.getItem('gemini_model_usage') || '{}');
+            usage[modelName] = (usage[modelName] || 0) + 1;
+            localStorage.setItem('gemini_model_usage', JSON.stringify(usage));
+            window.dispatchEvent(new CustomEvent('gemini_usage_updated'));
+        } catch (e) {
+            console.error("Usage recording failed:", e);
+        }
+    };
 
     const systemPrompt = `당신은 최고 수준의 데이터베이스 설계 전문가이자 데이터 아키텍트입니다.
 입력된 비즈니스 요구사항 또는 프로젝트 문서를 분석하여 최적화된 논리적 데이터 모델을 도출하고 Mermaid.js erDiagram 형식으로 시각화 코드를 생성하는 것이 당신의 사명입니다.
@@ -55,52 +70,78 @@ ${(documentText || '').substring(0, 20000)}
     if (onProgress) onProgress("데이터베이스 모델 분석 및 ERD 설계 중...");
 
     try {
-        let targetModel = "models/gemini-2.0-flash";
-        let availableModels = [];
-        // 무료 요금제 한도를 아끼기 위해 매번 모델 리스트를 fetch하는 대신 안정적인 모델들을 하드코딩하여 사용합니다.
-        availableModels = ["models/gemini-2.0-flash", "models/gemini-1.5-flash", "models/gemini-2.5-flash"];
+        const FALLBACK_MODELS = [
+            "models/gemini-2.0-flash",
+            "models/gemini-3-flash-preview",
+            "models/gemini-1.5-flash-latest",
+            "models/gemini-1.5-pro-latest"
+        ];
+        
+        let initialModel = selectedModel && selectedModel !== 'auto' ? selectedModel : FALLBACK_MODELS[0];
+        if (!initialModel.startsWith('models/')) initialModel = `models/${initialModel}`;
+        
+        let currentModelIndex = FALLBACK_MODELS.indexOf(initialModel);
+        if (currentModelIndex === -1) currentModelIndex = 0;
 
-        // 지능형 재시도 로직 정의 (Exponential Backoff)
-        const fetchWithRetry = async (url, options, maxRetries = 5) => {
-            let retries = 0;
-            while (retries < maxRetries) {
-                const response = await fetch(url, options);
-                if (response.ok) return response;
+        const fetchWithRetry = async (maxModelRetries = 3) => {
+            let modelRetries = 0;
+            while (modelRetries < maxModelRetries) {
+                const activeKey = keys[currentKeyIndex];
+                const modelId = FALLBACK_MODELS[currentModelIndex];
+                const fetchUrl = `https://generativelanguage.googleapis.com/v1beta/${modelId}:generateContent?key=${activeKey}`;
+                
+                const fetchOptions = {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{ role: "user", parts: [{ text: userInput }] }],
+                        generationConfig: { 
+                            temperature: 0.1, 
+                            maxOutputTokens: 8192,
+                            responseMimeType: "application/json"
+                        }
+                    })
+                };
 
-                // 429: 할당량 초과 시 대기 후 재시도
+                const response = await fetch(fetchUrl, fetchOptions);
+                
+                if (response.ok) {
+                    recordUsage(modelId); // 사용량 기록
+                    return response;
+                }
+
                 if (response.status === 429) {
-                    const waitTime = Math.pow(2, retries) * 3000 + (Math.random() * 2000); // 3~5s, 6~8s...
-                    const waitSec = Math.round(waitTime / 1000);
+                    // 1. 다음 API 키로 즉시 시도
+                    if (keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
+                        currentKeyIndex++;
+                        if (onProgress) onProgress(`현재 키 할당량 초과... 다음 키로 교체 시도 중 (${currentKeyIndex + 1}/${keys.length})`);
+                        continue;
+                    }
+
+                    // 2. 모든 키가 소진된 경우 -> 5초 대기 후 모델 변경
+                    modelRetries++;
+                    if (modelRetries < maxModelRetries) {
+                        currentKeyIndex = 0; // 새 모델은 첫 번째 키부터 다시
+                        const nextModelIndex = (currentModelIndex + 1) % FALLBACK_MODELS.length;
+                        const nextModelName = FALLBACK_MODELS[nextModelIndex].split('/').pop();
+                        
+                        if (onProgress) onProgress(`모든 API 할당량 초과... 5초 후 모델을 [${nextModelName}]으로 변경하여 재시도합니다.`);
+                        
+                        await new Promise(resolve => setTimeout(resolve, 5000));
+                        currentModelIndex = nextModelIndex;
+                        continue;
+                    }
                     
-                    if (onProgress) onProgress(`API 한도 초과로 인해 ${waitSec}초 후 자동 재시도합니다... (시도 ${retries + 1}/${maxRetries})`);
-                    console.warn(`[ERD API] 429 발생. ${waitSec}초 대기 중...`);
-                    
-                    await new Promise(r => setTimeout(r, waitTime));
-                    retries++;
-                    continue;
+                    throw new Error("모든 API 키와 모델의 사용 한도가 소진되었습니다.");
                 }
 
                 const errData = await response.json();
                 throw new Error(errData.error?.message || response.statusText);
             }
-            throw new Error("분당 요청 한도가 모두 소진되었습니다. 잠시 후(약 1분 뒤) 다시 시도해 주세요.");
+            throw new Error("모든 API 키의 사용 한도가 초과되었습니다.");
         };
 
-        const fetchUrl = `https://generativelanguage.googleapis.com/v1beta/${targetModel.startsWith('models/') ? targetModel : `models/${targetModel}`}:generateContent?key=${apiKey}`;
-        const fetchOptions = {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                contents: [{ role: "user", parts: [{ text: userInput }] }],
-                generationConfig: { 
-                    temperature: 0.1, 
-                    maxOutputTokens: 8192,
-                    responseMimeType: "application/json"
-                }
-            })
-        };
-
-        const response = await fetchWithRetry(fetchUrl, fetchOptions);
+        const response = await fetchWithRetry();
         const data = await response.json();
         let content = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
 
@@ -110,20 +151,7 @@ ${(documentText || '').substring(0, 20000)}
             jsonStr = jsonStr.replace(/\s*```[\s\S]*$/, '');
         }
 
-        let parsedData;
-        try {
-            parsedData = JSON.parse(jsonStr);
-        } catch (err) {
-            console.error("JSON 파싱 실패 원본 길이:", jsonStr.length, "내용:", jsonStr);
-            let truncStr = jsonStr.length > 60 ? (jsonStr.slice(0, 30) + "..." + jsonStr.slice(-30)) : jsonStr;
-            const msg = err.message || "";
-            if (msg.includes("end of JSON input") || msg.includes("unterminated") || msg.includes("Unexpected token")) {
-                throw new Error(`AI 응답 파싱 실패 (${msg}): 결과가 생성 도중 짤렸거나 형식이 잘못되었습니다. (본문크기: ${jsonStr.length}자) 분석 범위를 줄여 재시도해주세요. [${truncStr}]`);
-            }
-            throw new Error(`AI 응답 형식 오류 (${msg}) [${truncStr}]`);
-        }
-        
-        return parsedData;
+        return JSON.parse(jsonStr);
     } catch (e) {
         console.error("ERD Analysis Error:", e);
         throw new Error(`ERD 설계 실패: ${e.message}`);

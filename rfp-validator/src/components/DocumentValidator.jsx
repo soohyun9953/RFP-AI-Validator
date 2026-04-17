@@ -2,16 +2,13 @@ import React, { useState, useCallback, useRef } from 'react';
 import { ArrowRight, Loader2, RotateCcw, ShieldCheck } from 'lucide-react';
 import InputSection from './InputSection';
 import ResultDashboard from './ResultDashboard';
-import { analyzeDocuments } from '../mockAnalyzer';
 import { analyzeDocumentsWithLLM } from '../llmAnalyzer';
 
-function DocumentValidator({ apiKey }) {
+function DocumentValidator({ apiKey, selectedModel }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisStage, setAnalysisStage] = useState(0); // 1: 추출, 2: 심층분석
   const [retryStatus, setRetryStatus] = useState(null); // API 재시도 상태 메시지
   const [resultData, setResultData] = useState(null);
-  const [isLlmMode, setIsLlmMode] = useState(false);
-  const [isInputMinimized, setIsInputMinimized] = useState(false);
   const lastParams = useRef(null);
 
   const handleAnalyze = useCallback(async (guideline, artifact, inspectionScope, glossary, artifactFileName) => {
@@ -22,7 +19,6 @@ function DocumentValidator({ apiKey }) {
     setAnalysisStage(1); // 1단계: 문장 단위 추출 시작
     
     // 분석 시작 시 좌측 패널 자동 접기 (공간 확보)
-    setIsInputMinimized(true);
 
     // 시각적 연출을 위한 인위적 지연 (UX 목적)
     await new Promise(resolve => setTimeout(resolve, 2500));
@@ -30,49 +26,27 @@ function DocumentValidator({ apiKey }) {
 
     try {
       if (apiKey && apiKey.startsWith('AIza')) {
-        setIsLlmMode(true);
         const result = await analyzeDocumentsWithLLM(
           guideline, artifact, inspectionScope, apiKey, glossary,
-          (status) => setRetryStatus(status)
+          (status) => setRetryStatus(status),
+          selectedModel
         );
         setResultData({ ...result, artifactFileName });
-        setIsAnalyzing(false);
-        setAnalysisStage(0);
-        setRetryStatus(null);
       } else {
-        setIsLlmMode(false);
-        // 분석 시뮬레이션 (입력 텍스트를 실제로 파싱하여 결과 생성)
-        setTimeout(() => {
-          try {
-            const result = analyzeDocuments(guideline, artifact, inspectionScope, glossary);
-            setResultData({ ...result, artifactFileName });
-          } catch (e) {
-            console.error('[DocumentValidator] 분석 오류:', e);
-            setResultData({
-              score: 0,
-              inspectionScope: inspectionScope || null,
-              summary: `분석 중 오류가 발생했습니다: ${e?.message || '알 수 없는 오류'}`,
-              rtm: [],
-              requirementMapping: [],
-              omissions: [],
-              typos: [],
-            });
-          }
-          setIsAnalyzing(false);
-          setAnalysisStage(0);
-        }, 1000);
+        throw new Error('유효한 Gemini API Key가 필요합니다. 상단 설정 메뉴에서 API Key를 입력해 주세요.');
       }
     } catch (e) {
-        console.error('[DocumentValidator] LLM 분석 오류:', e);
+        console.error('[DocumentValidator] 검증 오류:', e);
         setResultData({
             score: 0,
             inspectionScope: inspectionScope || null,
-            summary: `LLM 검증 중 오류가 발생했습니다: ${e?.message || '알 수 없는 오류'}`,
+            summary: `검증 중 오류가 발생했습니다: ${e?.message || '알 수 없는 오류'}`,
             rtm: [],
             requirementMapping: [],
             omissions: [],
             typos: [],
         });
+    } finally {
         setIsAnalyzing(false);
         setAnalysisStage(0);
         setRetryStatus(null);
@@ -95,13 +69,7 @@ function DocumentValidator({ apiKey }) {
 
   return (
     <div style={{ display: 'flex', width: '100%', height: '100%', gap: '24px', minHeight: 0, overflow: 'hidden' }}>
-      <InputSection 
-        onAnalyze={handleAnalyze} 
-        isAnalyzing={isAnalyzing} 
-        onReset={handleReset} 
-        isMinimized={isInputMinimized}
-        onToggleMinimize={() => setIsInputMinimized(!isInputMinimized)}
-      />
+      <InputSection onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} onReset={handleReset} />
 
       {isAnalyzing ? (
         <div className="glass-panel animate-fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', padding: '40px' }}>

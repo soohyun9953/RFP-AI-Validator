@@ -3,7 +3,7 @@ import { Send, Scale, User, Bot, Loader2, Sparkles, X, Copy, Check } from 'lucid
 import { askLawAssistant, askGeneralLawAssistant } from '../lawAnalyzer';
 import { refDB } from '../utils/db';
 
-function LawConsultant({ apiKey, isMcpMode = true }) {
+function LawConsultant({ apiKey, isMcpMode = false }) {
   const [messages, setMessages] = useState([
     { role: 'model', text: isMcpMode 
         ? '안녕하세요! 실시간 법령 조회가 가능한 [MCP 기반] AI 법률 자문입니다.\n\n지능형 검색 도구를 사용하여 최신 법령을 직접 조회하고 답변해 드립니다.\n(※ MCP 모드는 정확한 검색을 위해 여러 번의 AI 호출이 발생하여 토큰 소모량이 많을 수 있습니다.)'
@@ -182,7 +182,7 @@ function LawConsultant({ apiKey, isMcpMode = true }) {
         {isMcpMode ? <Scale size={24} color="var(--accent-purple)" /> : <Sparkles size={24} color="var(--success-color)" />}
         <div>
           <h2 style={{ margin: 0, fontSize: '18px', color: 'var(--text-primary)' }}>
-            {isMcpMode ? 'AI 법률/규정 자문 에이전트 (MCP)' : 'AI 법률/규정 일반 자문 (Gemini)'}
+            {isMcpMode ? 'AI 법률/규정 자문 에이전트 (MCP)' : 'AI 법률 자문(제미나이)'}
           </h2>
           <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
             {isMcpMode ? '한국 법령(korean-law-mcp) 기반 실무 검토 및 해설' : '실시간 검색 없는 Gemini 내부 지식 기반 빠른 해설'}
