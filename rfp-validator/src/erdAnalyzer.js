@@ -62,6 +62,11 @@ export async function analyzeERDWithLLM(documentText, apiKey, onProgress, select
 - 속성이 있는 경우 "Entity { type name PK/FK \"설명\" }" 형식을 따르되, **코드 내에 절대로 역슬래시(\) 문자를 포함하지 마십시오.**
 - 관계 차수(1:N 등)를 Mermaid 기호(|o, o|, ||, }o, o{ 등)로 정확히 표현하십시오.
 
+[데이터 안정성 가이드]
+- **절대 주의**: JSON 내부의 모든 문자열값에서 실제 줄바꿈(raw newline)을 사용하지 마십시오. 줄바꿈이 필요한 경우 반드시 `\n` 이스케이프 문자를 사용하십시오.
+- 모든 필드(특히 reason, normalizationNotes, summary)는 핵심 위주로 명확하고 간결하게 작성하여 전체 응답 길이를 최적화하십시오.
+- 응답이 잘리지 않도록 최대 길이에 도달하기 전에 논리적으로 JSON을 마감하십시오.
+
 [주의사항]
 - 결과는 반드시 순수 JSON 형태여야 합니다.
 - **다시 한 번 강력하게 지시합니다. JSON 구조의 entities 배열에 기입된 항목들은 생략되거나 축약되어서는 안 됩니다.**`;
@@ -104,7 +109,7 @@ ${(documentText || '').substring(0, 20000)}
                         contents: [{ role: "user", parts: [{ text: userInput }] }],
                         generationConfig: { 
                             temperature: 0.1, 
-                            maxOutputTokens: 8192,
+                            maxOutputTokens: 16384,
                             responseMimeType: "application/json"
                         }
                     })
