@@ -104,10 +104,13 @@ export async function askLawAssistant(query, apiKey, history = [], onMcpCall = n
   }
 
   const FALLBACK_MODELS = [
-    "models/gemini-2.0-flash",
-    "models/gemini-3-flash-preview",
-    "models/gemini-1.5-flash-latest",
-    "models/gemini-1.5-pro-latest"
+    "models/gemini-2.5-pro",
+    "models/gemini-2.5-flash",
+    "models/gemini-2.5-flash-lite",
+    "models/gemini-1.5-flash",
+    "models/gemini-1.5-pro",
+    "models/gemini-1.5-flash-8b",
+    "models/gemini-2.0-flash-exp"
   ];
 
   let currentKeyIndex = 0;
@@ -140,25 +143,32 @@ export async function askLawAssistant(query, apiKey, history = [], onMcpCall = n
           return await response.json();
         }
 
-        if (response.status === 429) {
-          // 1. 키 로테이션
-          if (keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
+        const errorData = await response.json().catch(() => ({}));
+        const errMsg = errorData.error?.message || `API 요청 실패 (${response.status})`;
+        const isModelUnavailable = response.status === 404
+          || response.status === 400
+          || errMsg.toLowerCase().includes('not found')
+          || errMsg.toLowerCase().includes('not supported')
+          || errMsg.toLowerCase().includes('deprecated');
+
+        if (response.status === 429 || isModelUnavailable) {
+          // 1. 키 로테이션 (할당량 초과 시)
+          if (response.status === 429 && keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
             currentKeyIndex++;
             continue;
           }
 
-          // 2. 모델 폴백
+          // 2. 5초 대기 후 모델 폴백
           modelRetries++;
           if (modelRetries < maxModelRetries) {
             currentKeyIndex = 0;
             currentModelIndex = (currentModelIndex + 1) % FALLBACK_MODELS.length;
-            await new Promise(r => setTimeout(r, 2000)); // 짧은 대기
+            await new Promise(r => setTimeout(r, 5000)); // 5초 대기 후 모델 전환
             continue;
           }
         }
 
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || `API 요청 실패 (${response.status})`);
+        throw new Error(errMsg);
       } catch (err) {
         if (modelRetries >= maxModelRetries - 1) throw err;
         modelRetries++;
@@ -249,10 +259,13 @@ export async function askGeneralLawAssistant(query, apiKey, history = []) {
   if (keys.length === 0) throw new Error("유효한 Gemini API Key가 필요합니다.");
 
   const FALLBACK_MODELS = [
-    "models/gemini-2.0-flash",
-    "models/gemini-3-flash-preview",
-    "models/gemini-1.5-flash-latest",
-    "models/gemini-1.5-pro-latest"
+    "models/gemini-2.5-pro",
+    "models/gemini-2.5-flash",
+    "models/gemini-2.5-flash-lite",
+    "models/gemini-1.5-flash",
+    "models/gemini-1.5-pro",
+    "models/gemini-1.5-flash-8b",
+    "models/gemini-2.0-flash-exp"
   ];
 
   let currentKeyIndex = 0;
@@ -277,8 +290,16 @@ export async function askGeneralLawAssistant(query, apiKey, history = []) {
 
         if (response.ok) return await response.json();
 
-        if (response.status === 429) {
-          if (keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
+        const errData = await response.json().catch(() => ({}));
+        const errMsg = errData.error?.message || `API 요청 실패 (${response.status})`;
+        const isModelUnavailable = response.status === 404
+          || response.status === 400
+          || errMsg.toLowerCase().includes('not found')
+          || errMsg.toLowerCase().includes('not supported')
+          || errMsg.toLowerCase().includes('deprecated');
+
+        if (response.status === 429 || isModelUnavailable) {
+          if (response.status === 429 && keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
             currentKeyIndex++;
             continue;
           }
@@ -286,12 +307,11 @@ export async function askGeneralLawAssistant(query, apiKey, history = []) {
           if (modelRetries < FALLBACK_MODELS.length) {
             currentKeyIndex = 0;
             currentModelIndex++;
-            await new Promise(r => setTimeout(r, 2000));
+            await new Promise(r => setTimeout(r, 5000));
             continue;
           }
         }
-        const errData = await response.json();
-        throw new Error(errData.error?.message || `API 요청 실패 (${response.status})`);
+        throw new Error(errMsg);
       } catch (err) {
         if (modelRetries >= FALLBACK_MODELS.length - 1) throw err;
         modelRetries++;

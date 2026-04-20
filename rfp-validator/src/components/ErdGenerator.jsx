@@ -632,9 +632,11 @@ const ResultSection = ({ result, onOpenJsonViewer }) => {
   );
 };
 
+
 // ── 메인 ErdGenerator 컴포넌트 ────────────────────────────────
 const ErdGenerator = ({ apiKey }) => {
   const [inputText, setInputText] = useState('');
+  const [feedback, setFeedback] = useState(''); // 추가 요청사항 상태
   const [fileName, setFileName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -716,24 +718,51 @@ const ErdGenerator = ({ apiKey }) => {
     }
     setError(null);
     setIsAnalyzing(true);
-    setResult(null);
+    setResult(null); // 신규 분석 시 초기화
+    setProgressMsg(feedback.trim() ? "요청사항을 반영하여 요구사항 분석 중..." : "데이터 요구사항 분석 중...");
+    
     try {
-      const data = await analyzeERDWithLLM(inputText, apiKey, (msg) => setProgressMsg(msg), 'auto');
+      const data = await analyzeERDWithLLM(inputText, apiKey, (msg) => setProgressMsg(msg), 'auto', null, feedback);
       setResult(data);
     } catch (err) {
       setError(err.message);
-      // 대소문자 관계없이 'quota', 'limit', 'exhausted' 키워드 체크
       const lowerErr = err.message.toLowerCase();
       if (lowerErr.includes("quota") || lowerErr.includes("limit") || lowerErr.includes("exhausted") || lowerErr.includes("429")) {
         startCooldown(60);
       }
     } finally {
       setIsAnalyzing(false);
+      setProgressMsg('');
+    }
+  };
+
+  const handleRefine = async () => {
+    if (!apiKey || !apiKey.startsWith('AIza')) {
+      alert('Gemini API 키가 필요합니다.');
+      return;
+    }
+    setError(null);
+    setIsAnalyzing(true);
+    setProgressMsg("추가 요청사항 반영 중...");
+    
+    try {
+      const data = await analyzeERDWithLLM(inputText, apiKey, (msg) => setProgressMsg(msg), 'auto', result, feedback);
+      setResult(data);
+    } catch (err) {
+      setError(err.message);
+      const lowerErr = err.message.toLowerCase();
+      if (lowerErr.includes("quota") || lowerErr.includes("limit") || lowerErr.includes("exhausted") || lowerErr.includes("429")) {
+        startCooldown(60);
+      }
+    } finally {
+      setIsAnalyzing(false);
+      setProgressMsg('');
     }
   };
 
   const handleReset = () => {
     setInputText('');
+    setFeedback('');
     setFileName('');
     setResult(null);
     setError(null);
@@ -772,7 +801,29 @@ const ErdGenerator = ({ apiKey }) => {
             <input type="file" ref={fileInputRef} hidden accept={ALL_ACCEPT} onChange={(e) => handleFileSelect(e.target.files[0])} />
           </div>
 
-          {/* 드래그 앤 드롭 wrapping zone */}
+          {/* ── 추가 요청사항 (상단 배치) ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Play size={14} color="var(--accent-purple)" fill="var(--accent-purple)" />
+              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)' }}>강조사항/추가요청사항:</span>
+            </div>
+            <textarea 
+              placeholder="분석 시 특별히 고려할 점(예: '특정 엔티티 추가', 'PK 형식 지정' 등)을 입력하세요. 공백 시 일반 요구사항 기반으로 설계됩니다."
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+              disabled={isAnalyzing}
+              style={{ 
+                width: '100%', height: '50px', 
+                background: 'rgba(0,0,0,0.25)', border: '1px solid var(--panel-border)', 
+                borderRadius: '10px', padding: '12px 14px', 
+                color: 'var(--text-primary)', fontSize: '13px', 
+                resize: 'none', transition: 'border-color 0.2s',
+                outline: 'none'
+              }}
+            />
+          </div>
+
+          {/* 메인 요구사항 텍스트 영역 */}
           <div
             onDragEnter={handleDragEnter}
             onDragLeave={handleDragLeave}
@@ -782,9 +833,8 @@ const ErdGenerator = ({ apiKey }) => {
           >
             <textarea placeholder="데이터베이스 설계의 근거가 될 비즈니스 로직, 요구사항, RFP 내용 등을 자유롭게 입력하세요. 상세할수록 정확한 모델이 도출됩니다. (파일을 이 영역에 드래그해도 됩니다)"
               value={inputText} onChange={(e) => setInputText(e.target.value)}
-              style={{ width: '100%', height: '160px', background: isDragging ? 'rgba(59,130,246,0.06)' : 'rgba(0,0,0,0.2)', border: `1px solid ${isDragging ? 'var(--accent-blue)' : 'var(--panel-border)'}`, borderRadius: '12px', padding: '16px', color: 'var(--text-primary)', fontSize: '14px', lineHeight: '1.6', resize: 'none', transition: 'border-color 0.2s, background 0.2s', boxSizing: 'border-box' }}
+              style={{ width: '100%', height: '140px', background: isDragging ? 'rgba(59,130,246,0.06)' : 'rgba(0,0,0,0.2)', border: `1px solid ${isDragging ? 'var(--accent-blue)' : 'var(--panel-border)'}`, borderRadius: '12px', padding: '16px', color: 'var(--text-primary)', fontSize: '14px', lineHeight: '1.6', resize: 'none', transition: 'border-color 0.2s, background 0.2s', boxSizing: 'border-box' }}
             />
-            {/* 드래그 오버레이 */}
             {isDragging && (
               <div style={{
                 position: 'absolute', inset: 0,
@@ -802,33 +852,55 @@ const ErdGenerator = ({ apiKey }) => {
             )}
           </div>
 
-          <button className="interactive" onClick={handleAnalyze}
-            disabled={isAnalyzing || isLoading || !inputText.trim() || cooldown > 0}
-            style={{ 
-              width: '100%', padding: '16px', borderRadius: '12px', border: 'none', 
-              background: (isAnalyzing || isLoading || !inputText.trim() || cooldown > 0) 
-                ? 'rgba(255,255,255,0.05)' 
-                : 'linear-gradient(135deg, var(--accent-purple), var(--accent-blue))', 
-              color: (isAnalyzing || isLoading || !inputText.trim() || cooldown > 0) ? 'var(--text-muted)' : 'white', 
-              fontWeight: 700, fontSize: '16px', 
-              cursor: (isAnalyzing || isLoading || !inputText.trim() || cooldown > 0) ? 'not-allowed' : 'pointer', 
-              boxShadow: (isAnalyzing || isLoading || !inputText.trim() || cooldown > 0) ? 'none' : '0 8px 20px rgba(168,85,247,0.2)', 
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', 
-              transition: 'all 0.3s ease'
-            }}>
-            {isAnalyzing ? (
-              <Loader2 size={20} className="animate-spin" />
-            ) : cooldown > 0 ? (
-              <AlertCircle size={20} />
-            ) : (
-              <Play size={20} fill="currentColor" />
+          {/* 분석 시작/반영 버튼 통합 */}
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button className="interactive" onClick={handleAnalyze}
+              disabled={isAnalyzing || isLoading || !inputText.trim() || cooldown > 0}
+              style={{ 
+                flex: result ? 1 : 2, padding: '16px', borderRadius: '12px', border: 'none', 
+                background: (isAnalyzing || isLoading || !inputText.trim() || cooldown > 0) 
+                  ? 'rgba(255,255,255,0.05)' 
+                  : result ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg, var(--accent-purple), var(--accent-blue))', 
+                color: (isAnalyzing || isLoading || !inputText.trim() || cooldown > 0) ? 'var(--text-muted)' : 'white', 
+                fontWeight: 700, fontSize: '16px', 
+                cursor: (isAnalyzing || isLoading || !inputText.trim() || cooldown > 0) ? 'not-allowed' : 'pointer', 
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', 
+                transition: 'all 0.3s ease'
+              }}>
+              {isAnalyzing && !result ? (
+                <Loader2 size={20} className="animate-spin" />
+              ) : cooldown > 0 ? (
+                <AlertCircle size={20} />
+              ) : (
+                <Play size={20} fill="currentColor" />
+              )}
+              {isAnalyzing && !result
+                ? progressMsg || 'AI 분석 중...' 
+                : cooldown > 0 
+                  ? `대기 중 (${cooldown}초)` 
+                  : result ? '새로 분석하기' : 'ERD 논리 모델 설계 시작'}
+            </button>
+
+            {result && (
+              <button className="interactive" onClick={handleRefine}
+                disabled={isAnalyzing || !feedback.trim() || cooldown > 0}
+                style={{ 
+                  flex: 2, padding: '16px', borderRadius: '12px', border: 'none', 
+                  background: (isAnalyzing || !feedback.trim() || cooldown > 0) 
+                    ? 'rgba(255,255,255,0.05)' 
+                    : 'linear-gradient(135deg, var(--accent-purple), var(--accent-blue))', 
+                  color: (isAnalyzing || !feedback.trim() || cooldown > 0) ? 'var(--text-muted)' : 'white', 
+                  fontWeight: 700, fontSize: '16px', 
+                  cursor: (isAnalyzing || !feedback.trim() || cooldown > 0) ? 'not-allowed' : 'pointer', 
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', 
+                  transition: 'all 0.3s ease',
+                  boxShadow: (isAnalyzing || !feedback.trim() || cooldown > 0) ? 'none' : '0 8px 20px rgba(168,85,247,0.2)'
+                }}>
+                {isAnalyzing ? <Loader2 size={20} className="animate-spin" /> : <Play size={20} fill="currentColor" />}
+                {isAnalyzing ? progressMsg || '요청 반영 중...' : '추가 요청사항 반영하기'}
+              </button>
             )}
-            {isAnalyzing 
-              ? progressMsg || 'AI 분석 중...' 
-              : cooldown > 0 
-                ? `서버 안정화 대기 중 (${cooldown}초)` 
-                : 'ERD 논리 모델 설계 시작'}
-          </button>
+          </div>
         </div>
 
         {/* ── 에러 표시 ── */}
@@ -840,7 +912,13 @@ const ErdGenerator = ({ apiKey }) => {
 
         {/* ── 결과 탭 뷰 (① 탭 UI) ── */}
         {result && (
-          <ResultSection result={result} onOpenJsonViewer={() => setShowJsonModal(true)} />
+          <ResultSection 
+            result={result} 
+            onOpenJsonViewer={() => setShowJsonModal(true)} 
+            onRefine={handleRefine}
+            isRefining={isAnalyzing}
+            progressMsg={progressMsg}
+          />
         )}
 
         {/* 하단 여백 */}

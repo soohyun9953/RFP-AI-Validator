@@ -1,4 +1,4 @@
-export async function analyzeERDWithLLM(documentText, apiKey, onProgress, selectedModel = 'auto') {
+export async function analyzeERDWithLLM(documentText, apiKey, onProgress, selectedModel = 'auto', previousResult = null, additionalFeedback = null) {
     const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.startsWith('AIza'));
     if (keys.length === 0) {
         throw new Error("유효한 API 키가 제공되지 않았습니다.");
@@ -78,22 +78,51 @@ export async function analyzeERDWithLLM(documentText, apiKey, onProgress, select
 - 결과는 반드시 순수 JSON 형태여야 합니다.
 - **다시 한 번 강력하게 지시합니다. JSON 구조의 entities 배열에 기입된 항목들은 생략되거나 축약되어서는 안 됩니다.**`;
 
-    const userInput = `
+    const isRefinement = previousResult && additionalFeedback;
+    const hasInitialFeedback = !previousResult && additionalFeedback;
+    
+    let userInput = `
 [시스템 지시사항]
 ${systemPrompt}
 
-[입력 데이터 - 분석 대상 문서]
-${(documentText || '').substring(0, 20000)}
+[입력 데이터 - 분석 대상 요구사항 문서]
+${(documentText || '').substring(0, 15000)}
 `;
 
-    if (onProgress) onProgress("데이터베이스 모델 분석 및 ERD 설계 중...");
+    if (isRefinement) {
+        userInput += `
+[이전 설계 결과 (JSON)]
+${JSON.stringify(previousResult, null, 2)}
+
+[사용자 추가 요청사항 - 최우선 반영]
+${additionalFeedback}
+
+위의 '이전 설계 결과'에 '사용자 추가 요청사항'을 반영하여 설계를 수정하십시오. 
+기존 설계의 장점은 유지하되, 요청된 변경 사항을 정확하게 적용하고 관련 엔티티나 관계를 함께 조정하십시오.
+결과는 반드시 처음에 정의된 JSON 형식을 완벽하게 유지해야 합니다.
+`;
+    } else if (hasInitialFeedback) {
+        userInput += `
+[사용자 추가 요청 및 강조 사항]
+${additionalFeedback}
+
+요구사항 문서를 분석할 때 위의 '사용자 추가 요청 및 강조 사항'을 최우선적으로 고려하여 설계를 진행하십시오.
+`;
+    }
+
+    if (onProgress) {
+        onProgress(isRefinement ? "추가 요청사항을 반영하여 설계를 수정 중..." : "데이터베이스 모델 분석 및 ERD 설계 중...");
+    }
 
     try {
         const FALLBACK_MODELS = [
-            "models/gemini-2.0-flash",
-            "models/gemini-3-flash-preview",
-            "models/gemini-1.5-flash-latest",
-            "models/gemini-1.5-pro-latest"
+            "models/gemini-2.5-pro",
+            "models/gemini-2.5-flash",
+            "models/gemini-2.5-flash-lite",
+            "models/gemini-1.5-flash",
+            "models/gemini-1.5-pro",
+            "models/gemini-1.5-flash-8b",
+            "models/gemini-2.0-flash-exp"
         ];
         
         let initialModel = selectedModel && selectedModel !== 'auto' ? selectedModel : FALLBACK_MODELS[0];
@@ -102,7 +131,7 @@ ${(documentText || '').substring(0, 20000)}
         let currentModelIndex = FALLBACK_MODELS.indexOf(initialModel);
         if (currentModelIndex === -1) currentModelIndex = 0;
 
-        const fetchWithRetry = async (maxModelRetries = 3) => {
+        const fetchWithRetry = async (maxModelRetries = FALLBACK_MODELS.length) => {
             let modelRetries = 0;
             while (modelRetries < maxModelRetries) {
                 const activeKey = keys[currentKeyIndex];
@@ -129,22 +158,31 @@ ${(documentText || '').substring(0, 20000)}
                     return response;
                 }
 
-                if (response.status === 429) {
-                    // 1. 다음 API 키로 즉시 시도
-                    if (keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
+                const errData = await response.json().catch(() => ({}));
+                const errMsg = errData.error?.message || response.statusText || '';
+                const isModelUnavailable = response.status === 404 
+                    || response.status === 400
+                    || errMsg.toLowerCase().includes('not found')
+                    || errMsg.toLowerCase().includes('not supported')
+                    || errMsg.toLowerCase().includes('deprecated');
+
+                if (response.status === 429 || isModelUnavailable) {
+                    // 1. 다음 API 키로 즉시 시도 (할당량 초과 시)
+                    if (response.status === 429 && keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
                         currentKeyIndex++;
                         if (onProgress) onProgress(`현재 키 할당량 초과... 다음 키로 교체 시도 중 (${currentKeyIndex + 1}/${keys.length})`);
                         continue;
                     }
 
-                    // 2. 모든 키가 소진된 경우 -> 5초 대기 후 모델 변경
+                    // 2. 모델 변경: 5초 대기 후 다음 모델로 전환
                     modelRetries++;
                     if (modelRetries < maxModelRetries) {
-                        currentKeyIndex = 0; // 새 모델은 첫 번째 키부터 다시
+                        currentKeyIndex = 0;
                         const nextModelIndex = (currentModelIndex + 1) % FALLBACK_MODELS.length;
                         const nextModelName = FALLBACK_MODELS[nextModelIndex].split('/').pop();
+                        const reason = isModelUnavailable && response.status !== 429 ? '모델 미지원' : '할당량 초과';
                         
-                        if (onProgress) onProgress(`모든 API 할당량 초과... 5초 후 모델을 [${nextModelName}]으로 변경하여 재시도합니다.`);
+                        if (onProgress) onProgress(`[${reason}] 5초 후 모델을 [${nextModelName}]으로 변경하여 재시도합니다.`);
                         
                         await new Promise(resolve => setTimeout(resolve, 5000));
                         currentModelIndex = nextModelIndex;
@@ -154,10 +192,9 @@ ${(documentText || '').substring(0, 20000)}
                     throw new Error("모든 API 키와 모델의 사용 한도가 소진되었습니다.");
                 }
 
-                const errData = await response.json();
-                throw new Error(errData.error?.message || response.statusText);
+                throw new Error(errMsg || response.statusText);
             }
-            throw new Error("모든 API 키의 사용 한도가 초과되었습니다.");
+            throw new Error("모든 모델을 시도했으나 응답을 받지 못했습니다.");
         };
 
         const response = await fetchWithRetry();
@@ -165,12 +202,57 @@ ${(documentText || '').substring(0, 20000)}
         let content = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
 
         let jsonStr = content.trim();
+        // 마크다운 코드블록 제거
         if (jsonStr.includes("```")) {
             jsonStr = jsonStr.replace(/^[\s\S]*?```(?:json|JSON)?\s*/, '');
             jsonStr = jsonStr.replace(/\s*```[\s\S]*$/, '');
         }
 
-        return JSON.parse(jsonStr);
+        // JSON 정제: char-by-char 스캔으로 문자열 내 비이스케이프 제어문자 처리
+        const cleanControlChars = (s) => {
+            let result = '';
+            let inString = false;
+            let escaped = false;
+            for (let i = 0; i < s.length; i++) {
+                const ch = s[i];
+                if (escaped) { result += ch; escaped = false; continue; }
+                if (ch === '\\') { escaped = true; result += ch; continue; }
+                if (ch === '"') { inString = !inString; result += ch; continue; }
+                if (inString) {
+                    if (ch === '\n') { result += '\\n'; continue; }
+                    if (ch === '\r') { result += '\\r'; continue; }
+                    if (ch === '\t') { result += '\\t'; continue; }
+                    if (ch.charCodeAt(0) < 32) continue; // 기타 제어문자 제거
+                }
+                result += ch;
+            }
+            return result;
+        };
+
+        const sanitizeJson = (str) => {
+            // 1차: 원본 그대로
+            try { return JSON.parse(str); } catch (_) {}
+
+            // 2차: 제어문자 정제 후 파싱
+            const cleaned = cleanControlChars(str);
+            try { return JSON.parse(cleaned); } catch (_) {}
+
+            // 3차: 후행 쉼표 제거 후 파싱
+            try {
+                return JSON.parse(cleaned.replace(/,\s*([}\]])/g, '$1'));
+            } catch (_) {}
+
+            // 4차: {…} 블록만 추출 후 파싱
+            const match = cleaned.match(/\{[\s\S]*\}/);
+            if (match) {
+                try { return JSON.parse(match[0]); } catch (_) {}
+                try { return JSON.parse(match[0].replace(/,\s*([}\]])/g, '$1')); } catch (_) {}
+            }
+
+            throw new Error("AI 응답을 JSON으로 파싱할 수 없습니다. 다시 시도해 주세요.");
+        };
+
+        return sanitizeJson(jsonStr);
     } catch (e) {
         console.error("ERD Analysis Error:", e);
         throw new Error(`ERD 설계 실패: ${e.message}`);

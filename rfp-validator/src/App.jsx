@@ -25,13 +25,29 @@ import {
   ChevronLeft,
   ChevronRight,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  Trash2
 } from 'lucide-react';
 import { processFile } from './utils/fileExtractor';
 
+// Google Analytics 이벤트 헬퍼
+const gaEvent = (eventName, params = {}) => {
+  if (typeof window.gtag === 'function') {
+    window.gtag('event', eventName, params);
+  }
+};
+
 function App() {
   const [activeTab, setActiveTab] = useState('main');
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
+  // apiKeys: 문자열 배열로 관리, 기존 localStorage 콤마 구분 값과 호환
+  const [apiKeys, setApiKeys] = useState(() => {
+    const stored = localStorage.getItem('gemini_api_key') || '';
+    const parsed = stored.split(',').map(k => k.trim()).filter(Boolean);
+    return parsed.length > 0 ? parsed : [''];
+  });
+  const [newKeyInput, setNewKeyInput] = useState('');
+  // 하위 컴포넌트에 전달할 콤마 구분 문자열
+  const apiKey = apiKeys.filter(k => k.trim().startsWith('AIza')).join(',');
   const [modelUsage, setModelUsage] = useState(() => JSON.parse(localStorage.getItem('gemini_model_usage') || '{}'));
   const [showSettings, setShowSettings] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -42,10 +58,46 @@ function App() {
     localStorage.setItem('sidebar_collapsed', isSidebarCollapsed);
   }, [isSidebarCollapsed]);
 
+  // 탭 변경 시 GA 페이지뷰 전송
+  useEffect(() => {
+    const tabLabels = {
+      main: 'AI 산출물 검증',
+      typo: 'AI 교정교열',
+      law: 'AI 법률 자문(제미나이)',
+      'law-mcp': 'AI 법률 자문(MCP)',
+      erd: 'AI ERD 설계',
+      ppt: 'PPT 생성(엑셀기준)',
+      library: '참고자료 라이브러리',
+    };
+    gaEvent('page_view', {
+      page_title: tabLabels[activeTab] || activeTab,
+      page_location: window.location.href,
+      page_path: `/?tab=${activeTab}`,
+    });
+  }, [activeTab]);
+
   // 로컬 스토리지 동기화
   useEffect(() => {
     localStorage.setItem('gemini_api_key', apiKey);
   }, [apiKey]);
+
+  // API 키 추가
+  const handleAddKey = () => {
+    const trimmed = newKeyInput.trim();
+    if (!trimmed) return;
+    setApiKeys(prev => [...prev, trimmed]);
+    setNewKeyInput('');
+  };
+
+  // API 키 삭제
+  const handleRemoveKey = (idx) => {
+    setApiKeys(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  // API 키 개별 수정
+  const handleEditKey = (idx, value) => {
+    setApiKeys(prev => prev.map((k, i) => i === idx ? value : k));
+  };
 
 
 
@@ -114,6 +166,10 @@ function App() {
                 onClick={() => {
                   setActiveTab(tab.id);
                   setIsMobileMenuOpen(false);
+                  gaEvent('tab_click', {
+                    tab_id: tab.id,
+                    tab_label: tab.label,
+                  });
                 }}
               >
                 <div className="nav-icon-wrapper" style={{ color: isActive ? tab.color : 'inherit' }}>
@@ -182,18 +238,98 @@ function App() {
               <div className="settings-body">
                 <div className="setting-group">
                   <label>
-                    <Key size={14} /> Gemini API Keys 
-                    <span className="badge">{keyCount}개</span>
+                    <Key size={14} /> Gemini API Keys
+                    <span className="badge">{keyCount}개 연결됨</span>
                   </label>
-                  <div className="input-wrapper">
-                    <input 
-                      type="password" 
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      placeholder="AIza..., AIza... (여러 개는 콤마로 구분)"
-                    />
+
+                  {/* 등록된 키 목록 */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
+                    {apiKeys.map((k, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ position: 'relative', flex: 1 }}>
+                          <input
+                            type="password"
+                            value={k}
+                            onChange={(e) => handleEditKey(idx, e.target.value)}
+                            placeholder={`API Key ${idx + 1} (AIza...)`}
+                            style={{
+                              width: '100%',
+                              background: k.trim().startsWith('AIza')
+                                ? 'rgba(16,185,129,0.08)'
+                                : 'rgba(255,255,255,0.04)',
+                              border: `1px solid ${k.trim().startsWith('AIza') ? 'rgba(16,185,129,0.4)' : 'var(--glass-border)'}`,
+                              borderRadius: '8px',
+                              padding: '8px 12px',
+                              color: 'var(--text-primary)',
+                              fontSize: '12px',
+                              outline: 'none',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                        </div>
+                        <button
+                          onClick={() => handleRemoveKey(idx)}
+                          title="키 삭제"
+                          style={{
+                            background: 'rgba(239,68,68,0.1)',
+                            border: '1px solid rgba(239,68,68,0.3)',
+                            borderRadius: '7px',
+                            padding: '7px',
+                            cursor: 'pointer',
+                            color: '#ef4444',
+                            display: 'flex',
+                            alignItems: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                  <p className="helper-text">할당량 초과 시 자동으로 다음 키로 전환됩니다.</p>
+
+                  {/* 새 키 추가 입력창 */}
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input
+                      type="password"
+                      value={newKeyInput}
+                      onChange={(e) => setNewKeyInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddKey()}
+                      placeholder="새 API Key 입력 후 + 버튼 또는 Enter"
+                      style={{
+                        flex: 1,
+                        background: 'rgba(255,255,255,0.04)',
+                        border: '1px dashed var(--glass-border)',
+                        borderRadius: '8px',
+                        padding: '8px 12px',
+                        color: 'var(--text-primary)',
+                        fontSize: '12px',
+                        outline: 'none',
+                      }}
+                    />
+                    <button
+                      onClick={handleAddKey}
+                      title="키 추가"
+                      style={{
+                        background: 'rgba(99,102,241,0.15)',
+                        border: '1px solid rgba(99,102,241,0.4)',
+                        borderRadius: '7px',
+                        padding: '7px 12px',
+                        cursor: 'pointer',
+                        color: 'var(--accent-blue)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <PlusCircle size={14} /> 추가
+                    </button>
+                  </div>
+
+                  <p className="helper-text" style={{ marginTop: '6px' }}>할당량 초과 시 자동으로 다음 키로 전환됩니다.</p>
                 </div>
 
 

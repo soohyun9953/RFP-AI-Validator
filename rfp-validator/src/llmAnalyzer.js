@@ -135,10 +135,13 @@ ${inspectionScope || '없음'}
 
     try {
         const FALLBACK_MODELS = [
-            "models/gemini-2.0-flash",
-            "models/gemini-3-flash-preview",
-            "models/gemini-1.5-flash-latest",
-            "models/gemini-1.5-pro-latest"
+            "models/gemini-2.5-pro",
+            "models/gemini-2.5-flash",
+            "models/gemini-2.5-flash-lite",
+            "models/gemini-1.5-flash",
+            "models/gemini-1.5-pro",
+            "models/gemini-1.5-flash-8b",
+            "models/gemini-2.0-flash-exp"
         ];
         
         let initialModel = selectedModel && selectedModel !== 'auto' ? selectedModel : FALLBACK_MODELS[0];
@@ -147,7 +150,7 @@ ${inspectionScope || '없음'}
         let currentModelIndex = FALLBACK_MODELS.indexOf(initialModel);
         if (currentModelIndex === -1) currentModelIndex = 0;
 
-        const fetchWithRetry = async (maxModelRetries = 3) => {
+        const fetchWithRetry = async (maxModelRetries = FALLBACK_MODELS.length) => {
             let modelRetries = 0;
             
             while (modelRetries < maxModelRetries) {
@@ -175,23 +178,32 @@ ${inspectionScope || '없음'}
                     recordUsage(modelId); // 사용량 기록
                     return response;
                 }
-                
-                if (response.status === 429) {
-                    // 1. 다음 API 키로 즉시 시도
-                    if (keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
+
+                const errData = await response.json().catch(() => ({}));
+                const errMsg = errData.error?.message || response.statusText || '';
+                const isModelUnavailable = response.status === 404
+                    || response.status === 400
+                    || errMsg.toLowerCase().includes('not found')
+                    || errMsg.toLowerCase().includes('not supported')
+                    || errMsg.toLowerCase().includes('deprecated');
+
+                if (response.status === 429 || isModelUnavailable) {
+                    // 1. 다음 API 키로 즉시 시도 (할당량 초과 시)
+                    if (response.status === 429 && keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
                         currentKeyIndex++;
                         if (onProgress) onProgress(`현재 키 할당량 초과... 다음 키로 교체 시도 중 (${currentKeyIndex + 1}/${keys.length})`);
                         continue;
                     }
 
-                    // 2. 모든 키가 소진된 경우 -> 5초 대기 후 모델 변경
+                    // 2. 모델 변경: 5초 대기 후 다음 모델로 전환
                     modelRetries++;
                     if (modelRetries < maxModelRetries) {
-                        currentKeyIndex = 0; // 새 모델은 첫 번째 키부터 다시
+                        currentKeyIndex = 0;
                         const nextModelIndex = (currentModelIndex + 1) % FALLBACK_MODELS.length;
                         const nextModelName = FALLBACK_MODELS[nextModelIndex].split('/').pop();
+                        const reason = isModelUnavailable && response.status !== 429 ? '모델 미지원' : '할당량 초과';
                         
-                        if (onProgress) onProgress(`모든 API 할당량 초과... 5초 후 모델을 [${nextModelName}]으로 변경하여 재시도합니다.`);
+                        if (onProgress) onProgress(`[${reason}] 5초 후 모델을 [${nextModelName}]으로 변경하여 재시도합니다.`);
                         
                         await new Promise(resolve => setTimeout(resolve, 5000));
                         currentModelIndex = nextModelIndex;
@@ -201,10 +213,9 @@ ${inspectionScope || '없음'}
                     throw new Error("모든 API 키와 모델의 사용 한도가 소진되었습니다.");
                 }
                 
-                const err = await response.json();
-                throw new Error(err.error?.message || response.statusText);
+                throw new Error(errMsg || response.statusText);
             }
-            throw new Error("모든 API 키의 사용 한도가 소진되었습니다.");
+            throw new Error("모든 모델을 시도했으나 응답을 받지 못했습니다.");
         };
 
         const response = await fetchWithRetry();
