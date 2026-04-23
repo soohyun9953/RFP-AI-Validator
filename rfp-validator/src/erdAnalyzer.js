@@ -116,6 +116,7 @@ ${additionalFeedback}
 
     try {
         const FALLBACK_MODELS = [
+            "models/gemini-3-flash",
             "models/gemini-2.5-pro",
             "models/gemini-2.5-flash",
             "models/gemini-2.5-flash-lite",
@@ -181,8 +182,9 @@ ${additionalFeedback}
                         const nextModelIndex = (currentModelIndex + 1) % FALLBACK_MODELS.length;
                         const nextModelName = FALLBACK_MODELS[nextModelIndex].split('/').pop();
                         const reason = isModelUnavailable && response.status !== 429 ? '모델 미지원' : '할당량 초과';
+                        const currentModelName = modelId.split('/').pop();
                         
-                        if (onProgress) onProgress(`[${reason}] 5초 후 모델을 [${nextModelName}]으로 변경하여 재시도합니다.`);
+                        if (onProgress) onProgress(`[${reason}] [${currentModelName}] 소진 → 5초 후 [${nextModelName}]으로 변경하여 재시도합니다.`);
                         
                         await new Promise(resolve => setTimeout(resolve, 5000));
                         currentModelIndex = nextModelIndex;

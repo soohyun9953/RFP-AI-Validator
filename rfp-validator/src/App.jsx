@@ -5,6 +5,7 @@ import LawConsultant from './components/LawConsultant';
 import ErdGenerator from './components/ErdGenerator';
 import ReferenceLibrary from './components/ReferenceLibrary';
 import PptGenerator from './components/PptGenerator';
+import MeetingMinutes from './components/MeetingMinutes';
 import { 
   Shield, 
   Activity, 
@@ -26,7 +27,10 @@ import {
   ChevronRight,
   PanelLeftClose,
   PanelLeftOpen,
-  Trash2
+  Trash2,
+  Mic2,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { processFile } from './utils/fileExtractor';
 
@@ -52,6 +56,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => localStorage.getItem('sidebar_collapsed') === 'true');
+  const [showKey, setShowKey] = useState(false); // API 키 보이기/숨기기 토글
 
   // 사이드바 상태 저장
   useEffect(() => {
@@ -68,6 +73,7 @@ function App() {
       erd: 'AI ERD 설계',
       ppt: 'PPT 생성(엑셀기준)',
       library: '참고자료 라이브러리',
+      meeting: 'AI 회의록 생성',
     };
     gaEvent('page_view', {
       page_title: tabLabels[activeTab] || activeTab,
@@ -85,13 +91,31 @@ function App() {
   const handleAddKey = () => {
     const trimmed = newKeyInput.trim();
     if (!trimmed) return;
-    setApiKeys(prev => [...prev, trimmed]);
+    if (!apiKeys.includes(trimmed)) {
+      setApiKeys(prev => {
+        // 빈 키가 하나만 있다면 그걸 교체, 아니면 뒤에 추가
+        if (prev.length === 1 && prev[0].trim() === '') return [trimmed];
+        return [...prev, trimmed];
+      });
+    }
     setNewKeyInput('');
   };
 
+  // 붙여넣기 자동 등록 (새 키 입력창에 키를 붙여넣으면 즉시 등록)
+  useEffect(() => {
+    const trimmed = newKeyInput.trim();
+    if (trimmed.startsWith('AIza') && trimmed.length > 30) {
+      handleAddKey();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newKeyInput]);
+
   // API 키 삭제
   const handleRemoveKey = (idx) => {
-    setApiKeys(prev => prev.filter((_, i) => i !== idx));
+    setApiKeys(prev => {
+        const next = prev.filter((_, i) => i !== idx);
+        return next.length > 0 ? next : [''];
+    });
   };
 
   // API 키 개별 수정
@@ -118,6 +142,7 @@ function App() {
     { id: 'law-mcp', label: 'AI 법률 자문(MCP)', icon: MessageSquare, color: 'var(--accent-purple)' },
     { id: 'erd', label: 'AI ERD 설계', icon: Database, color: 'var(--warning-color)' },
     { id: 'ppt', label: 'PPT 생성(엑셀기준)', icon: FileText, color: '#f97316' },
+    { id: 'meeting', label: 'AI 회의록 생성', icon: Mic2, color: '#8b5cf6' },
     { id: 'library', label: '참고자료 라이브러리', icon: Activity, color: '#64748b' },
   ];
 
@@ -215,7 +240,7 @@ function App() {
 
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', marginRight: '8px' }}>
               <span className="mobile-hide-text" style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>Last Update</span>
-              <span style={{ fontSize: '12px', color: 'var(--accent-blue)', fontWeight: 700, fontFamily: 'monospace' }}>2026. 04. 17 11:00</span>
+              <span style={{ fontSize: '12px', color: 'var(--accent-blue)', fontWeight: 700, fontFamily: 'monospace' }}>2026. 04. 20 18:00</span>
             </div>
             
             <button 
@@ -237,10 +262,19 @@ function App() {
               
               <div className="settings-body">
                 <div className="setting-group">
-                  <label>
-                    <Key size={14} /> Gemini API Keys
-                    <span className="badge">{keyCount}개 연결됨</span>
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <label style={{ margin: 0 }}>
+                      <Key size={14} /> Gemini API Keys
+                      <span className="badge">{keyCount}개 연결됨</span>
+                    </label>
+                    <button 
+                      onClick={() => setShowKey(!showKey)} 
+                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
+                      title="키 텍스트 보이기/숨기기"
+                    >
+                      {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
 
                   {/* 등록된 키 목록 */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
@@ -248,7 +282,7 @@ function App() {
                       <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <div style={{ position: 'relative', flex: 1 }}>
                           <input
-                            type="password"
+                            type={showKey ? "text" : "password"}
                             value={k}
                             onChange={(e) => handleEditKey(idx, e.target.value)}
                             placeholder={`API Key ${idx + 1} (AIza...)`}
@@ -291,7 +325,7 @@ function App() {
                   {/* 새 키 추가 입력창 */}
                   <div style={{ display: 'flex', gap: '6px' }}>
                     <input
-                      type="password"
+                      type={showKey ? "text" : "password"}
                       value={newKeyInput}
                       onChange={(e) => setNewKeyInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleAddKey()}
@@ -374,6 +408,7 @@ function App() {
           {activeTab === 'law-mcp' && <LawConsultant apiKey={apiKey} isMcpMode={true} />}
           {activeTab === 'erd' && <ErdGenerator apiKey={apiKey} />}
           {activeTab === 'ppt' && <PptGenerator apiKey={apiKey} />}
+          {activeTab === 'meeting' && <MeetingMinutes apiKey={apiKey} />}
           {activeTab === 'library' && <ReferenceLibrary />}
         </div>
       </main>

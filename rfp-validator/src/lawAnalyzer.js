@@ -104,6 +104,7 @@ export async function askLawAssistant(query, apiKey, history = [], onMcpCall = n
   }
 
   const FALLBACK_MODELS = [
+    "models/gemini-3-flash",
     "models/gemini-2.5-pro",
     "models/gemini-2.5-flash",
     "models/gemini-2.5-flash-lite",
@@ -259,6 +260,7 @@ export async function askGeneralLawAssistant(query, apiKey, history = []) {
   if (keys.length === 0) throw new Error("유효한 Gemini API Key가 필요합니다.");
 
   const FALLBACK_MODELS = [
+    "models/gemini-3-flash",
     "models/gemini-2.5-pro",
     "models/gemini-2.5-flash",
     "models/gemini-2.5-flash-lite",
