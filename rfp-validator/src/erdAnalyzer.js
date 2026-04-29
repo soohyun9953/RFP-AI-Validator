@@ -1,5 +1,5 @@
 export async function analyzeERDWithLLM(documentText, apiKey, onProgress, selectedModel = 'auto', previousResult = null, additionalFeedback = null) {
-    const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.startsWith('AIza'));
+    const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.match(/^(AIza|AQ\.)/));
     if (keys.length === 0) {
         throw new Error("유효한 API 키가 제공되지 않았습니다.");
     }
@@ -167,21 +167,22 @@ ${additionalFeedback}
                     || errMsg.toLowerCase().includes('not supported')
                     || errMsg.toLowerCase().includes('deprecated');
 
-                if (response.status === 429 || isModelUnavailable) {
-                    // 1. 다음 API 키로 즉시 시도 (할당량 초과 시)
-                    if (response.status === 429 && keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
-                        currentKeyIndex++;
-                        if (onProgress) onProgress(`현재 키 할당량 초과... 다음 키로 교체 시도 중 (${currentKeyIndex + 1}/${keys.length})`);
-                        continue;
-                    }
+                // 1. 에러 발생 시 항상 다음 API 키를 먼저 시도
+                if (keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
+                    currentKeyIndex++;
+                    const reasonStr = response.status === 429 ? '할당량 초과' : (response.status >= 500 ? '서버 지연' : 'API 오류');
+                    if (onProgress) onProgress(`[${reasonStr}] 다음 키로 교체 시도 중 (${currentKeyIndex + 1}/${keys.length})`);
+                    continue;
+                }
 
-                    // 2. 모델 변경: 5초 대기 후 다음 모델로 전환
+                // 2. 모든 키를 다 썼다면 모델 교체 시도
+                if (response.status === 429 || response.status >= 500 || isModelUnavailable) {
                     modelRetries++;
                     if (modelRetries < maxModelRetries) {
                         currentKeyIndex = 0;
                         const nextModelIndex = (currentModelIndex + 1) % FALLBACK_MODELS.length;
                         const nextModelName = FALLBACK_MODELS[nextModelIndex].split('/').pop();
-                        const reason = isModelUnavailable && response.status !== 429 ? '모델 미지원' : '할당량 초과';
+                        const reason = isModelUnavailable && response.status !== 429 ? '모델 미지원' : (response.status === 429 ? '할당량 소진' : '서버 혼잡');
                         const currentModelName = modelId.split('/').pop();
                         
                         if (onProgress) onProgress(`[${reason}] [${currentModelName}] 소진 → 5초 후 [${nextModelName}]으로 변경하여 재시도합니다.`);

@@ -708,7 +708,7 @@ const ErdGenerator = ({ apiKey }) => {
   }, []);
 
   const handleAnalyze = async () => {
-    if (!apiKey || !apiKey.startsWith('AIza')) {
+    if (!apiKey || !apiKey.match(/^(AIza|AQ\.)/)) {
       alert('Gemini API 키가 필요합니다. 상단 설정 메뉴에서 API 키를 입력해 주세요.');
       return;
     }
@@ -737,7 +737,7 @@ const ErdGenerator = ({ apiKey }) => {
   };
 
   const handleRefine = async () => {
-    if (!apiKey || !apiKey.startsWith('AIza')) {
+    if (!apiKey || !apiKey.match(/^(AIza|AQ\.)/)) {
       alert('Gemini API 키가 필요합니다.');
       return;
     }

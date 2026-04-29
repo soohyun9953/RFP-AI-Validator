@@ -145,7 +145,7 @@ function LawConsultant({ apiKey, isMcpMode = false }) {
   const handleSend = async () => {
     if (!input.trim()) return;
     
-    if (!apiKey || !apiKey.startsWith('AIza')) {
+    if (!apiKey || !apiKey.match(/^(AIza|AQ\.)/)) {
         alert("유효한 Gemini API Key를 우측 상단에 입력해 주세요.");
         return;
     }

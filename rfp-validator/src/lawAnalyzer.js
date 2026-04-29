@@ -98,7 +98,7 @@ export async function askLawAssistant(query, apiKey, history = [], onMcpCall = n
     ]
   }];
 
-  const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.startsWith('AIza'));
+  const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.match(/^(AIza|AQ\.)/));
   if (keys.length === 0) {
     throw new Error("유효한 Gemini API Key가 필요합니다.");
   }
@@ -152,14 +152,14 @@ export async function askLawAssistant(query, apiKey, history = [], onMcpCall = n
           || errMsg.toLowerCase().includes('not supported')
           || errMsg.toLowerCase().includes('deprecated');
 
-        if (response.status === 429 || isModelUnavailable) {
-          // 1. 키 로테이션 (할당량 초과 시)
-          if (response.status === 429 && keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
-            currentKeyIndex++;
-            continue;
-          }
+        // 1. 에러 발생 시 항상 다음 API 키를 먼저 시도
+        if (keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
+          currentKeyIndex++;
+          continue;
+        }
 
-          // 2. 5초 대기 후 모델 폴백
+        // 2. 모든 키를 다 썼다면 모델 교체 시도
+        if (response.status === 429 || response.status >= 500 || isModelUnavailable) {
           modelRetries++;
           if (modelRetries < maxModelRetries) {
             currentKeyIndex = 0;
@@ -256,7 +256,7 @@ export async function askGeneralLawAssistant(query, apiKey, history = []) {
 3. 법령명은 「」으로 감싸고 전문적인 어조를 유지하세요.
   `;
 
-  const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.startsWith('AIza'));
+  const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.match(/^(AIza|AQ\.)/));
   if (keys.length === 0) throw new Error("유효한 Gemini API Key가 필요합니다.");
 
   const FALLBACK_MODELS = [
@@ -300,15 +300,18 @@ export async function askGeneralLawAssistant(query, apiKey, history = []) {
           || errMsg.toLowerCase().includes('not supported')
           || errMsg.toLowerCase().includes('deprecated');
 
-        if (response.status === 429 || isModelUnavailable) {
-          if (response.status === 429 && keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
-            currentKeyIndex++;
-            continue;
-          }
+        // 1. 에러 발생 시 항상 다음 API 키를 먼저 시도
+        if (keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
+          currentKeyIndex++;
+          continue;
+        }
+
+        // 2. 모든 키를 다 썼다면 모델 교체 시도
+        if (response.status === 429 || response.status >= 500 || isModelUnavailable) {
           modelRetries++;
           if (modelRetries < FALLBACK_MODELS.length) {
             currentKeyIndex = 0;
-            currentModelIndex++;
+            currentModelIndex = (currentModelIndex + 1) % FALLBACK_MODELS.length;
             await new Promise(r => setTimeout(r, 5000));
             continue;
           }

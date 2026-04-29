@@ -1,11 +1,139 @@
-export async function analyzeDocumentsWithLLM(guidelineText, artifactText, inspectionScope, apiKey, glossaryText, onProgress, selectedModel = 'auto') {
-    const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.startsWith('AIza'));
+function splitTextAtNewline(text) {
+    if (!text || text.length <= 1) return [text, ""];
+    const mid = Math.floor(text.length / 2);
+    
+    let nextNL = text.indexOf('\n', mid);
+    let prevNL = text.lastIndexOf('\n', mid);
+    
+    let splitIndex = -1;
+    if (nextNL !== -1 && prevNL !== -1) {
+        if ((nextNL - mid) < (mid - prevNL)) {
+            splitIndex = nextNL;
+        } else {
+            splitIndex = prevNL;
+        }
+    } else if (nextNL !== -1) {
+        splitIndex = nextNL;
+    } else if (prevNL !== -1) {
+        splitIndex = prevNL;
+    } else {
+        splitIndex = mid;
+    }
+
+    const part1 = text.substring(0, splitIndex).trim();
+    const part2 = text.substring(splitIndex).trim();
+    return [part1, part2];
+}
+
+function mergeResults(res1, res2, isTypoMode) {
+    const merged = {
+        score: Math.round((res1.score + res2.score) / 2),
+        inspectionScope: res1.inspectionScope || res2.inspectionScope,
+        summary: `[1부 분석 요약]\n${res1.summary}\n\n[2부 분석 요약]\n${res2.summary}`,
+        requirementMapping: [],
+        typos: []
+    };
+
+    if (isTypoMode) {
+        const uniqueTypos = [];
+        const seen = new Set();
+        const addTypos = (typos) => {
+            if (!typos) return;
+            typos.forEach(typo => {
+                const sig = `${typo.page}_${typo.originalText}_${typo.correction}`;
+                if (!seen.has(sig)) {
+                    seen.add(sig);
+                    uniqueTypos.push(typo);
+                }
+            });
+        };
+        addTypos(res1.typos);
+        addTypos(res2.typos);
+        merged.typos = uniqueTypos;
+    } else {
+        let combinedMapping = [];
+        if (res1.requirementMapping) combinedMapping = combinedMapping.concat(res1.requirementMapping);
+        if (res2.requirementMapping) combinedMapping = combinedMapping.concat(res2.requirementMapping);
+        
+        combinedMapping.forEach((req, index) => {
+            req.id = `REQ-${String(index + 1).padStart(3, '0')}`;
+        });
+        merged.requirementMapping = combinedMapping;
+
+        merged.rtm = combinedMapping.map(req => ({
+            type: req.type || '필수',
+            requirement: req.requirement || '-',
+            status: req.status || '미이행(X)',
+            location: req.artifactSection || '해당 없음',
+            category: req.category || '-',
+            levelLabel: req.levelLabel || '개별문장'
+        }));
+
+        merged.omissions = combinedMapping
+            .filter(req => req.status !== '이행(O)')
+            .map(req => ({
+                title: `[ID: ${req.id}] ${(req.requirement || '').substring(0, 30)}...`,
+                evidence: req.requirement || '-',
+                reason: req.gap || '구체적인 수행/설계 방안이 누락되었습니다.',
+                recommendation: '해당 요건을 만족하기 위한 구체적인 명세와 실행계획을 산출물에 추가해야 합니다.'
+            }));
+
+        const uniqueTypos = [];
+        const seen = new Set();
+        const addTypos = (typos) => {
+            if (!typos) return;
+            typos.forEach(typo => {
+                const sig = `${typo.location}_${typo.originalText}_${typo.correction}`;
+                if (!seen.has(sig)) {
+                    seen.add(sig);
+                    uniqueTypos.push(typo);
+                }
+            });
+        };
+        addTypos(res1.typos);
+        addTypos(res2.typos);
+        merged.typos = uniqueTypos;
+    }
+
+    return merged;
+}
+
+export async function analyzeDocumentsWithLLM(guidelineText, artifactText, inspectionScope, apiKey, glossaryText, onProgress, selectedModel = 'auto', isSubCall = false) {
+    const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.match(/^(AIza|AQ\.)/));
     if (keys.length === 0) {
         throw new Error("유효한 API 키가 제공되지 않았습니다.");
     }
 
     let currentKeyIndex = 0;
     const isOnlyTypoCheck = !guidelineText || guidelineText.trim() === '';
+
+    if (!isSubCall) {
+        if (isOnlyTypoCheck && artifactText && artifactText.length > 20000) {
+            if (onProgress) onProgress("산출물 용량이 커서 2회로 나누어 분석을 진행합니다. (1/2부 시작)");
+            const [part1, part2] = splitTextAtNewline(artifactText);
+            
+            const res1 = await analyzeDocumentsWithLLM(guidelineText, part1, inspectionScope, apiKey, glossaryText, onProgress, selectedModel, true);
+            
+            if (onProgress) onProgress("1부 분석 완료. 2부 분석을 진행합니다. (2/2부 시작)");
+            const res2 = await analyzeDocumentsWithLLM(guidelineText, part2, inspectionScope, apiKey, glossaryText, onProgress, selectedModel, true);
+            
+            if (onProgress) onProgress("분석 결과 병합 중...");
+            return mergeResults(res1, res2, true);
+        }
+        
+        if (!isOnlyTypoCheck && guidelineText && guidelineText.length > 15000) {
+            if (onProgress) onProgress("기준 문서 용량이 커서 2회로 나누어 분석을 진행합니다. (1/2부 시작)");
+            const [part1, part2] = splitTextAtNewline(guidelineText);
+            
+            const res1 = await analyzeDocumentsWithLLM(part1, artifactText, inspectionScope, apiKey, glossaryText, onProgress, selectedModel, true);
+            
+            if (onProgress) onProgress("1부 분석 완료. 2부 분석을 진행합니다. (2/2부 시작)");
+            const res2 = await analyzeDocumentsWithLLM(part2, artifactText, inspectionScope, apiKey, glossaryText, onProgress, selectedModel, true);
+            
+            if (onProgress) onProgress("분석 결과 병합 중...");
+            return mergeResults(res1, res2, false);
+        }
+    }
     
     // 사용량 기록 유틸리티
     const recordUsage = (modelName) => {
@@ -38,8 +166,9 @@ export async function analyzeDocumentsWithLLM(guidelineText, artifactText, inspe
 4. 오류가 없는 문단(또는 섹션)이 있다면 생략해도 되지만 검토를 건너뛴 것은 아니어야 합니다.
 5. 찾아낸 모든 수백 개의 오류 내역을 하나로 모아 아래 데이터 형식인 JSON 배열에 모두 담아서 출력하라.
 
-[출력 형식]
-반드시 프론트엔드 표 렌더링을 위해 아래 JSON 데이터 배열로만 출력하라. (아래 필드명을 엄격히 유지할 것)
+[출력 형식 및 필수 제약 사항]
+[제약 1] 반드시 프론트엔드 표 렌더링을 위해 아래 JSON 데이터 배열로만 출력하라. (아래 필드명을 엄격히 유지할 것)
+[제약 2] **동일한 단어, 동일한 오류를 무한 반복해서 출력하는 행위(Hallucination)를 엄격히 금지**합니다. 중복된 교정 내역은 반드시 하나로 병합하여 한 번만 출력하세요.
 {
   "score": 100,
   "inspectionScope": "<점검범위 텍스트 또는 null>",
@@ -188,21 +317,22 @@ ${inspectionScope || '없음'}
                     || errMsg.toLowerCase().includes('not supported')
                     || errMsg.toLowerCase().includes('deprecated');
 
-                if (response.status === 429 || isModelUnavailable) {
-                    // 1. 다음 API 키로 즉시 시도 (할당량 초과 시)
-                    if (response.status === 429 && keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
-                        currentKeyIndex++;
-                        if (onProgress) onProgress(`현재 키 할당량 초과... 다음 키로 교체 시도 중 (${currentKeyIndex + 1}/${keys.length})`);
-                        continue;
-                    }
+                // 1. 에러 발생 시 항상 다음 API 키를 먼저 시도
+                if (keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
+                    currentKeyIndex++;
+                    const reasonStr = response.status === 429 ? '할당량 초과' : (response.status >= 500 ? '서버 지연' : 'API 오류');
+                    if (onProgress) onProgress(`[${reasonStr}] 다음 키로 교체 시도 중 (${currentKeyIndex + 1}/${keys.length})`);
+                    continue;
+                }
 
-                    // 2. 모델 변경: 5초 대기 후 다음 모델로 전환
+                // 2. 모든 키를 다 썼다면 모델 교체 시도
+                if (response.status === 429 || response.status >= 500 || isModelUnavailable) {
                     modelRetries++;
                     if (modelRetries < maxModelRetries) {
                         currentKeyIndex = 0;
                         const nextModelIndex = (currentModelIndex + 1) % FALLBACK_MODELS.length;
                         const nextModelName = FALLBACK_MODELS[nextModelIndex].split('/').pop();
-                        const reason = isModelUnavailable && response.status !== 429 ? '모델 미지원' : '할당량 초과';
+                        const reason = isModelUnavailable && response.status !== 429 ? '모델 미지원' : (response.status === 429 ? '할당량 소진' : '서버 혼잡');
                         const currentModelName = modelId.split('/').pop();
                         
                         if (onProgress) onProgress(`[${reason}] [${currentModelName}] 소진 → 5초 후 [${nextModelName}]으로 변경하여 재시도합니다.`);
@@ -225,11 +355,55 @@ ${inspectionScope || '없음'}
         let content = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
 
         if (content.includes("```")) {
-            const match = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-            if (match && match[1]) content = match[1];
+            const match = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+            if (match && match[1]) {
+                content = match[1];
+            } else {
+                content = content.replace(/```(?:json)?/gi, '').replace(/```/g, '');
+            }
         }
+        
+        content = content.trim();
+        
+        // JSON 객체 또는 배열의 시작과 끝을 찾아 불필요한 앞뒤 문자열 제거
+        const firstBrace = content.indexOf('{');
+        const firstBracket = content.indexOf('[');
+        const lastBrace = content.lastIndexOf('}');
+        const lastBracket = content.lastIndexOf(']');
+        
+        const firstCharIndex = (firstBrace === -1) ? firstBracket : (firstBracket === -1 ? firstBrace : Math.min(firstBrace, firstBracket));
+        const lastCharIndex = Math.max(lastBrace, lastBracket);
 
-        const parsed = JSON.parse(content);
+        let parsed;
+        try {
+            parsed = JSON.parse(content);
+        } catch (parseError) {
+            console.warn("JSON 파싱 에러 발생. 텍스트 잘림 현상으로 간주하여 복구를 시도합니다.", parseError);
+            try {
+                // 불완전한 마지막 요소를 잘라내고 가장 마지막으로 닫힌 객체 '}' 기준으로 문자열을 자름
+                const lastValidObjEnd = content.lastIndexOf('}');
+                if (lastValidObjEnd > -1) {
+                    let repaired = content.substring(0, lastValidObjEnd + 1);
+                    
+                    // 열린 배열/객체 괄호 짝 맞추기
+                    const openBrackets = (repaired.match(/\[/g) || []).length;
+                    const closeBrackets = (repaired.match(/\]/g) || []).length;
+                    for (let i = 0; i < (openBrackets - closeBrackets); i++) repaired += ']';
+                    
+                    const openBraces = (repaired.match(/\{/g) || []).length;
+                    const closeBraces = (repaired.match(/\}/g) || []).length;
+                    for (let i = 0; i < (openBraces - closeBraces); i++) repaired += '}';
+                    
+                    parsed = JSON.parse(repaired);
+                    console.log("JSON 복구 성공!");
+                } else {
+                    throw parseError; // 복구 불가
+                }
+            } catch (repairError) {
+                console.error("JSON 복구 실패:", repairError);
+                throw new Error("너무 많은 오류가 검출되어 AI 응답이 한도를 초과했습니다. 점검 범위를 줄여서 다시 시도해주세요.");
+            }
+        }
 
         if (parsed.requirementMapping && Array.isArray(parsed.requirementMapping)) {
             if (!parsed.rtm) {
@@ -252,12 +426,26 @@ ${inspectionScope || '없음'}
                         recommendation: '해당 요건을 만족하기 위한 구체적인 명세와 실행계획을 산출물에 추가해야 합니다.'
                     }));
             }
-            if (!parsed.typos) parsed.typos = [];
         } else {
             parsed.requirementMapping = [];
             parsed.rtm = [];
             parsed.omissions = [];
+        }
+        
+        if (!parsed.typos) {
             parsed.typos = [];
+        } else {
+            // 중복 교정 내용(무한 반복 환각) 제거 로직 추가
+            const uniqueTypos = [];
+            const seen = new Set();
+            parsed.typos.forEach(typo => {
+                const signature = `${typo.page}_${typo.originalText}_${typo.correction}`;
+                if (!seen.has(signature)) {
+                    seen.add(signature);
+                    uniqueTypos.push(typo);
+                }
+            });
+            parsed.typos = uniqueTypos;
         }
 
         return parsed;

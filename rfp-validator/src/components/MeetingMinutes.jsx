@@ -97,7 +97,7 @@ function buildPlainText(result) {
 
 // ── Gemini API로 문서에서 전문 용어 추출 ────────
 async function extractTermsFromText(text, apiKey) {
-  const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.startsWith('AIza'));
+  const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.match(/^(AIza|AQ\.)/));
   if (keys.length === 0) throw new Error('유효한 API 키가 없습니다.');
 
   const MODELS = ['models/gemini-3-flash', 'models/gemini-2.5-flash', 'models/gemini-2.5-flash-lite', 'models/gemini-1.5-flash', 'models/gemini-2.0-flash-exp'];
@@ -114,8 +114,11 @@ async function extractTermsFromText(text, apiKey) {
 [분석할 문서]
 ${text.substring(0, 80000)}`;
 
-  for (let mi = 0; mi < MODELS.length; mi++) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/${MODELS[mi]}:generateContent?key=${keys[0]}`;
+  let currentKeyIndex = 0;
+  let currentModelIndex = 0;
+
+  while (currentModelIndex < MODELS.length) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/${MODELS[currentModelIndex]}:generateContent?key=${keys[currentKeyIndex]}`;
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -124,15 +127,31 @@ ${text.substring(0, 80000)}`;
         generationConfig: { temperature: 0.1 },
       }),
     });
-    if (!res.ok) continue;
-    const data = await res.json();
-    let content = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-    if (content.includes('```')) {
-      const m = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-      if (m?.[1]) content = m[1];
+    
+    if (res.ok) {
+      const data = await res.json();
+      let content = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+      if (content.includes('```')) {
+        const m = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (m?.[1]) content = m[1];
+      }
+      try {
+        const parsed = JSON.parse(content);
+        return (parsed.terms || []).sort((a, b) => (b.freq || 0) - (a.freq || 0));
+      } catch (e) {
+        return [];
+      }
     }
-    const parsed = JSON.parse(content);
-    return (parsed.terms || []).sort((a, b) => (b.freq || 0) - (a.freq || 0));
+
+    // 1. 에러 발생 시 항상 다음 API 키를 먼저 시도
+    if (keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
+      currentKeyIndex++;
+      continue;
+    }
+
+    // 2. 모든 키를 다 썼다면 모델 교체 시도
+    currentKeyIndex = 0;
+    currentModelIndex++;
   }
   throw new Error('용어 추출에 실패했습니다.');
 }
@@ -229,7 +248,7 @@ export default function MeetingMinutes({ apiKey }) {
 
   // ── 용어 파일 처리 (클릭/드롭 공통) ──────────
   const handleTermFilePick = useCallback(async (file) => {
-    const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.startsWith('AIza'));
+    const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.match(/^(AIza|AQ\.)/));
     if (keys.length === 0) { setExtractError('설정에서 Gemini API 키를 먼저 입력하세요.'); return; }
 
     setIsExtractingTerms(true);
@@ -305,7 +324,7 @@ export default function MeetingMinutes({ apiKey }) {
     if (inputMode === 'audio' && !audioFile) { setError('오디오 파일을 먼저 업로드하세요.'); return; }
     if (inputMode === 'text' && !textInput.trim()) { setError('분석할 텍스트를 먼저 입력하세요.'); return; }
     
-    const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.startsWith('AIza'));
+    const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.match(/^(AIza|AQ\.)/));
     if (keys.length === 0) { setError('설정에서 Gemini API 키를 먼저 입력하세요.'); return; }
     
     setIsLoading(true); setError(''); setResult(null);

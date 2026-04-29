@@ -180,7 +180,7 @@ function buildPrompt(terminology) {
 
 // ── 메인 분석 함수 ────────────────────────────
 export async function analyzeMeeting(inputData, inputType = 'audio', apiKey, terminology = [], onProgress) {
-    const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.startsWith('AIza'));
+    const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.match(/^(AIza|AQ\.)/));
     if (keys.length === 0) throw new Error('유효한 API 키가 없습니다.');
 
     let currentKeyIndex = 0;
@@ -267,22 +267,22 @@ export async function analyzeMeeting(inputData, inputType = 'audio', apiKey, ter
                 || errMsg.toLowerCase().includes('high demand')
                 || errMsg.toLowerCase().includes('overloaded');
 
+            // 1. 에러 발생 시 항상 다음 API 키를 먼저 시도
+            if (keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
+                currentKeyIndex++;
+                const reasonStr = res.status === 429 ? '할당량 초과' : (res.status >= 500 ? '서버 지연' : 'API 오류');
+                if (onProgress) onProgress(`[${reasonStr}] 다음 키로 전환 (${currentKeyIndex + 1}/${keys.length})`);
+                continue;
+            }
+            
+            // 2. 모든 키를 다 썼다면 모델 교체 시도
             if (isOverloaded || isModelUnsupported) {
-                // 다음 API 키 시도 (오버로드 시 우선 적용)
-                if (isOverloaded && keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
-                    currentKeyIndex++;
-                    const reasonStr = res.status === 429 ? '할당량 초과' : '서버 지연';
-                    if (onProgress) onProgress(`[${reasonStr}] 다음 키로 전환 (${currentKeyIndex + 1}/${keys.length})`);
-                    continue;
-                }
-                
-                // 모든 키를 시도했거나 미지원 모델이면 다음 모델로 전환
                 modelRetries++;
                 if (modelRetries < maxRetries) {
                     currentKeyIndex = 0;
                     currentModelIndex = (currentModelIndex + 1) % FALLBACK_MODELS.length;
                     const nextModel = FALLBACK_MODELS[currentModelIndex].split('/').pop();
-                    const reason = isModelUnsupported ? '미지원 모델' : (res.status === 429 ? '할당량 1차 소진' : '서버 혼잡');
+                    const reason = isModelUnsupported ? '미지원 모델/오류' : (res.status === 429 ? '할당량 소진' : '서버 혼잡');
                     const currentModelName = modelId.split('/').pop();
                     if (onProgress) onProgress(`[${reason}] [${currentModelName}] 소진 → 5초 후 [${nextModel}](으)로 재시도...`);
                     await new Promise(r => setTimeout(r, 5000));

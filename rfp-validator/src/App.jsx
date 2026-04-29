@@ -6,10 +6,12 @@ import ErdGenerator from './components/ErdGenerator';
 import ReferenceLibrary from './components/ReferenceLibrary';
 import PptGenerator from './components/PptGenerator';
 import MeetingMinutes from './components/MeetingMinutes';
+import AiPptDesigner from './components/AiPptDesigner';
 import { 
   Shield, 
   Activity, 
   FileText, 
+  Presentation,
   CheckCircle2, 
   MessageSquare, 
   Database, 
@@ -51,7 +53,7 @@ function App() {
   });
   const [newKeyInput, setNewKeyInput] = useState('');
   // 하위 컴포넌트에 전달할 콤마 구분 문자열
-  const apiKey = apiKeys.filter(k => k.trim().startsWith('AIza')).join(',');
+  const apiKey = apiKeys.filter(k => k.trim().startsWith('AIza') || k.trim().startsWith('AQ.')).join(',');
   const [modelUsage, setModelUsage] = useState(() => JSON.parse(localStorage.getItem('gemini_model_usage') || '{}'));
   const [showSettings, setShowSettings] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -72,6 +74,7 @@ function App() {
       'law-mcp': 'AI 법률 자문(MCP)',
       erd: 'AI ERD 설계',
       ppt: 'PPT 생성(엑셀기준)',
+      aippt: 'AI PPT 디자이너',
       library: '참고자료 라이브러리',
       meeting: 'AI 회의록 생성',
     };
@@ -93,22 +96,12 @@ function App() {
     if (!trimmed) return;
     if (!apiKeys.includes(trimmed)) {
       setApiKeys(prev => {
-        // 빈 키가 하나만 있다면 그걸 교체, 아니면 뒤에 추가
         if (prev.length === 1 && prev[0].trim() === '') return [trimmed];
         return [...prev, trimmed];
       });
     }
     setNewKeyInput('');
   };
-
-  // 붙여넣기 자동 등록 (새 키 입력창에 키를 붙여넣으면 즉시 등록)
-  useEffect(() => {
-    const trimmed = newKeyInput.trim();
-    if (trimmed.startsWith('AIza') && trimmed.length > 30) {
-      handleAddKey();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [newKeyInput]);
 
   // API 키 삭제
   const handleRemoveKey = (idx) => {
@@ -141,6 +134,7 @@ function App() {
     { id: 'law', label: 'AI 법률 자문(제미나이)', icon: MessageSquare, color: 'var(--success-color)' },
     { id: 'law-mcp', label: 'AI 법률 자문(MCP)', icon: MessageSquare, color: 'var(--accent-purple)' },
     { id: 'erd', label: 'AI ERD 설계', icon: Database, color: 'var(--warning-color)' },
+    { id: 'aippt', label: 'AI PPT 디자이너(작업중)', icon: Presentation, color: '#ec4899' },
     { id: 'ppt', label: 'PPT 생성(엑셀기준)', icon: FileText, color: '#f97316' },
     { id: 'meeting', label: 'AI 회의록 생성', icon: Mic2, color: '#8b5cf6' },
     { id: 'library', label: '참고자료 라이브러리', icon: Activity, color: '#64748b' },
@@ -148,7 +142,7 @@ function App() {
 
   const activeTabData = tabs.find(t => t.id === activeTab);
 
-  const keyCount = apiKey.split(',').filter(k => k.trim().startsWith('AIza')).length;
+  const keyCount = apiKey.split(',').filter(k => k.trim().startsWith('AIza') || k.trim().startsWith('AQ.')).length;
 
   return (
     <div className={`app-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
@@ -240,7 +234,7 @@ function App() {
 
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', marginRight: '8px' }}>
               <span className="mobile-hide-text" style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>Last Update</span>
-              <span style={{ fontSize: '12px', color: 'var(--accent-blue)', fontWeight: 700, fontFamily: 'monospace' }}>2026. 04. 20 18:00</span>
+              <span style={{ fontSize: '12px', color: 'var(--accent-blue)', fontWeight: 700, fontFamily: 'monospace' }}>2026. 04. 29 09:39</span>
             </div>
             
             <button 
@@ -285,13 +279,13 @@ function App() {
                             type={showKey ? "text" : "password"}
                             value={k}
                             onChange={(e) => handleEditKey(idx, e.target.value)}
-                            placeholder={`API Key ${idx + 1} (AIza...)`}
+                            placeholder={`API Key ${idx + 1} (AIza... 또는 AQ...)`}
                             style={{
                               width: '100%',
-                              background: k.trim().startsWith('AIza')
+                              background: (k.trim().startsWith('AIza') || k.trim().startsWith('AQ.'))
                                 ? 'rgba(16,185,129,0.08)'
                                 : 'rgba(255,255,255,0.04)',
-                              border: `1px solid ${k.trim().startsWith('AIza') ? 'rgba(16,185,129,0.4)' : 'var(--glass-border)'}`,
+                              border: `1px solid ${(k.trim().startsWith('AIza') || k.trim().startsWith('AQ.')) ? 'rgba(16,185,129,0.4)' : 'var(--glass-border)'}`,
                               borderRadius: '8px',
                               padding: '8px 12px',
                               color: 'var(--text-primary)',
@@ -406,8 +400,9 @@ function App() {
           {activeTab === 'typo' && <TypoValidator apiKey={apiKey} />}
           {activeTab === 'law' && <LawConsultant apiKey={apiKey} isMcpMode={false} />}
           {activeTab === 'law-mcp' && <LawConsultant apiKey={apiKey} isMcpMode={true} />}
-          {activeTab === 'erd' && <ErdGenerator apiKey={apiKey} />}
-          {activeTab === 'ppt' && <PptGenerator apiKey={apiKey} />}
+          { activeTab === 'erd' && <ErdGenerator apiKey={apiKey} /> }
+          { activeTab === 'aippt' && <AiPptDesigner apiKey={apiKey} /> }
+          { activeTab === 'ppt' && <PptGenerator apiKey={apiKey} /> }
           {activeTab === 'meeting' && <MeetingMinutes apiKey={apiKey} />}
           {activeTab === 'library' && <ReferenceLibrary />}
         </div>

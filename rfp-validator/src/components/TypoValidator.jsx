@@ -23,7 +23,7 @@ function TypoValidator({ apiKey }) {
     setAnalysisStage(2);
 
     try {
-      if (apiKey && apiKey.startsWith('AIza')) {
+      if (apiKey && apiKey.match(/^(AIza|AQ\.)/)) {
         const result = await analyzeDocumentsWithLLM(
           '', artifact, inspectionScope, apiKey, glossary,
           (status) => setRetryStatus(status),

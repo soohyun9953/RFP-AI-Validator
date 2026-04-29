@@ -25,7 +25,7 @@ function DocumentValidator({ apiKey }) {
     setAnalysisStage(2); // 2단계: 의미론적 심층 분석 시작
 
     try {
-      if (apiKey && apiKey.startsWith('AIza')) {
+      if (apiKey && apiKey.match(/^(AIza|AQ\.)/)) {
         const result = await analyzeDocumentsWithLLM(
           guideline, artifact, inspectionScope, apiKey, glossary,
           (status) => setRetryStatus(status),
