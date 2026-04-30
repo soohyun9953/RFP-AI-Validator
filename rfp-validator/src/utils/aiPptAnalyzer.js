@@ -33,8 +33,10 @@ const systemPrompt = `당신은 최고 수준의 프레젠테이션 기획자이
 2. 텍스트 위주의 지루한 구성보다는, 도형과 다이어그램을 활용한 시각화를 최우선으로 고려하세요.
 3. 아키텍처, 시스템 구성, 프로세스 흐름, 핵심 기술 요소가 포함된 내용은 각각 ARCHITECTURE_LAYER, PROCESS_FLOW, KEYWORD_HIGHLIGHT 타입을 반드시 사용하여 고도화된 시각화 슬라이드를 생성하세요.
 
-[출력 형식 제한]
-반드시 다음 JSON 형식으로만 응답해야 합니다. 다른 설명이나 텍스트를 절대 포함하지 마세요.
+[출력 형식 제한 및 주의사항]
+1. 반드시 다음 JSON 형식으로만 응답해야 합니다. 다른 설명이나 텍스트를 절대 포함하지 마세요.
+2. JSON 내부의 문자열 값(Value) 안에 큰따옴표(")를 사용할 경우 반드시 이스케이프(\") 처리하거나 홑따옴표(')로 대체하세요.
+3. 문자열 내부의 줄바꿈은 실제 엔터가 아닌 \n 으로만 작성해야 합니다. (JSON 파싱 오류 방지)
 
 {
   "theme": "<추천 테마 색상 헥스코드 (예: #003366)>",
@@ -183,6 +185,9 @@ export async function analyzePptContent(inputText, emphasisText, inputSlideCount
         return JSON.parse(jsonStr);
     } catch (e) {
         console.error("PPT Analysis Error:", e);
+        if (e.message.includes("Unterminated string") || e.message.includes("Unexpected token") || e.message.includes("JSON")) {
+            throw new Error(`AI가 생성한 데이터 형식이 올바르지 않습니다. (JSON 파싱 오류)\n텍스트가 너무 길어 중간에 끊겼거나 특수문자 충돌일 수 있습니다. 다시 한번 시도해주세요.\n상세오류: ${e.message}`);
+        }
         throw new Error(`PPT 구조화 실패: ${e.message}`);
     }
 }

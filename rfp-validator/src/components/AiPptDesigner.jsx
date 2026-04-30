@@ -3,6 +3,7 @@ import { Presentation, FileText, Upload, Sparkles, Loader2, Download, AlertCircl
 import pptxgen from 'pptxgenjs';
 import JSZip from 'jszip';
 import { analyzePptContent } from '../utils/aiPptAnalyzer';
+import { injectSlidesIntoMaster, saveFileWithLocationPicker } from '../utils/pptExporter';
 
 export default function AiPptDesigner({ apiKey }) {
     const [inputText, setInputText] = useState('');
@@ -259,7 +260,19 @@ export default function AiPptDesigner({ apiKey }) {
             }
         });
 
-        await pres.writeFile({ fileName: "AI_Designed_Presentation.pptx" });
+        const aiGenBlob = await pres.write('blob');
+        
+        if (inputFile) {
+            try {
+                const mergedBlob = await injectSlidesIntoMaster(inputFile, aiGenBlob);
+                await saveFileWithLocationPicker(mergedBlob, `AI_마스터적용_${inputFile.name}`);
+                return;
+            } catch (err) {
+                console.error("마스터 템플릿 병합 실패, 기본 다운로드로 전환:", err);
+            }
+        }
+        
+        await saveFileWithLocationPicker(aiGenBlob, "AI_Designed_Presentation.pptx");
     };
 
     const handleGenerate = async () => {

@@ -5,6 +5,36 @@ import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
 
 /**
+ * 사용자가 저장할 위치와 파일명을 선택할 수 있도록 다이얼로그를 띄워 저장합니다.
+ * File System Access API를 지원하지 않는 브라우저에서는 기본 다운로드 방식으로 동작합니다.
+ */
+export async function saveFileWithLocationPicker(blob, defaultFileName) {
+    if ('showSaveFilePicker' in window) {
+        try {
+            const handle = await window.showSaveFilePicker({
+                suggestedName: defaultFileName,
+                types: [{
+                    description: 'PowerPoint Presentation',
+                    accept: { 'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'] },
+                }],
+            });
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            return true;
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                return false;
+            }
+            console.error('File System Access API 에러, 기본 다운로드 방식으로 전환합니다.', err);
+        }
+    }
+    // Fallback
+    saveAs(blob, defaultFileName);
+    return true;
+}
+
+/**
  * 엑셀 파일을 읽어서 JSON 배열로 변환합니다.
  */
 export async function parseExcelData(file) {
@@ -193,7 +223,7 @@ export async function generatePptFromTemplate(pptTemplateFile, dataRows, generat
                 mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
             });
 
-            saveAs(blob, '통합_데이터_리포트.pptx');
+            await saveFileWithLocationPicker(blob, '통합_데이터_리포트.pptx');
         } catch (error) {
             console.error('단일 PPT 생성 오류:', error);
             throw error;
@@ -209,3 +239,377 @@ async function createAndDownloadZip(files, zipFileName) {
     const content = await zip.generateAsync({ type: 'blob' });
     saveAs(content, zipFileName);
 }
+
+/**
+ * PPT 내 지정한 텍스트의 디자인을 일괄 변경합니다 (윤곽선: 흰색 실선, 투명도 100%).
+ */
+export async function applyTextDesignToPpt(pptFile, targetText) {
+    if (!pptFile) {
+        throw new Error('PPT 파일이 필요합니다.');
+    }
+    const trimmedTargetText = targetText ? targetText.trim() : '';
+
+    const arrayBuffer = await pptFile.arrayBuffer();
+    const zip = new PizZip(arrayBuffer);
+
+    const allFiles = Object.keys(zip.files);
+    const targetFilesSet = new Set();
+
+    if (trimmedTargetText !== '') {
+        const rawTarget = trimmedTargetText.replace(/\s+/g, '');
+        const checkFiles = allFiles.filter(p => p.endsWith('.xml') && 
+            (p.startsWith('ppt/slides/slide') || p.startsWith('ppt/slideLayouts/') || p.startsWith('ppt/slideMasters/'))
+        );
+        
+        checkFiles.forEach(slidePath => {
+            let slideText = '';
+            const filesInSlide = [slidePath];
+
+            const slideFileName = slidePath.split('/').pop();
+            const relsPath = slidePath.replace(slideFileName, '_rels/' + slideFileName + '.rels');
+            if (zip.files[relsPath]) {
+                try {
+                    const parser = new DOMParser();
+                    const relsStr = zip.file(relsPath).asText();
+                    const relsDoc = parser.parseFromString(relsStr, 'application/xml');
+                    const rels = relsDoc.getElementsByTagName('Relationship');
+                    for (let i = 0; i < rels.length; i++) {
+                        const target = rels[i].getAttribute('Target');
+                        if (target && target.endsWith('.xml')) {
+                            const targetFileName = target.split('/').pop();
+                            const actualPath = Object.keys(zip.files).find(p => p.endsWith(targetFileName) && p.startsWith('ppt/'));
+                            if (actualPath && !filesInSlide.includes(actualPath)) {
+                                filesInSlide.push(actualPath);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error parsing rels for slide:', slidePath, e);
+                }
+            }
+
+            const parser = new DOMParser();
+            filesInSlide.forEach(fp => {
+                try {
+                    const doc = parser.parseFromString(zip.file(fp).asText(), 'application/xml');
+                    const allNodes = doc.getElementsByTagName('*');
+                    for (let i = 0; i < allNodes.length; i++) {
+                        const localName = allNodes[i].localName || allNodes[i].tagName.split(':').pop();
+                        if (localName === 't') {
+                            slideText += allNodes[i].textContent;
+                        }
+                    }
+                } catch (e) {
+                    // 무시
+                }
+            });
+
+            const rawSlideText = slideText.replace(/\s+/g, '');
+            if (rawSlideText.includes(rawTarget)) {
+                filesInSlide.forEach(fp => targetFilesSet.add(fp));
+            }
+        });
+    } else {
+        allFiles.forEach(path => {
+            if (path.endsWith('.xml') && path.startsWith('ppt/')) {
+                if (!path.includes('presentation.xml') && 
+                    !path.includes('presProps.xml') && 
+                    !path.includes('viewProps.xml') && 
+                    !path.includes('tableStyles.xml')) {
+                    targetFilesSet.add(path);
+                }
+            }
+        });
+    }
+
+    if (targetFilesSet.size === 0) {
+        throw new Error('PPT 파일에서 대상 XML을 찾을 수 없거나 대상 텍스트가 포함된 슬라이드가 없습니다.');
+    }
+
+    const parser = new DOMParser();
+    const serializer = new XMLSerializer();
+    const nsA = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+
+    targetFilesSet.forEach(slidePath => {
+        let slideXmlStr = zip.file(slidePath).asText();
+        const xmlDoc = parser.parseFromString(slideXmlStr, 'application/xml');
+
+        const parserError = xmlDoc.getElementsByTagName('parsererror');
+        if (parserError.length > 0) {
+            console.error('XML Parsing Error in file:', slidePath);
+            return;
+        }
+
+        function applyLnToRPr(rPr) {
+            let existingLn = null;
+            for (let j = 0; j < rPr.childNodes.length; j++) {
+                const child = rPr.childNodes[j];
+                if (child.nodeType === 1) {
+                    const localName = child.localName || child.tagName.split(':').pop();
+                    if (localName === 'ln') {
+                        existingLn = child;
+                        break;
+                    }
+                }
+            }
+            if (existingLn) {
+                rPr.removeChild(existingLn);
+            }
+
+            const ln = xmlDoc.createElementNS(nsA, 'a:ln');
+            ln.setAttribute('w', '9525');
+            ln.setAttribute('cmpd', 'sng');
+
+            const solidFill = xmlDoc.createElementNS(nsA, 'a:solidFill');
+            const srgbClr = xmlDoc.createElementNS(nsA, 'a:srgbClr');
+            srgbClr.setAttribute('val', 'FFFFFF');
+
+            // 투명도 100% 복구
+            const alpha = xmlDoc.createElementNS(nsA, 'a:alpha');
+            alpha.setAttribute('val', '0');
+
+            srgbClr.appendChild(alpha);
+            solidFill.appendChild(srgbClr);
+            ln.appendChild(solidFill);
+            
+            const prstDash = xmlDoc.createElementNS(nsA, 'a:prstDash');
+            prstDash.setAttribute('val', 'solid');
+            ln.appendChild(prstDash);
+            
+            // 파워포인트 스키마(CT_TextCharacterProperties)에서 
+            // <a:ln>은 반드시 가장 첫 번째 자식 요소로 위치해야 합니다.
+            // (도형의 경우 fill 다음에 ln이 오지만, 텍스트는 ln이 fill보다 먼저 와야 합니다)
+            rPr.insertBefore(ln, rPr.firstChild);
+        }
+
+        const allElements = xmlDoc.getElementsByTagName('*');
+        for (let i = 0; i < allElements.length; i++) {
+            const el = allElements[i];
+            if (el.nodeType !== 1) continue;
+            const localName = el.localName || el.tagName.split(':').pop();
+            
+            if (localName === 'r' || localName === 'fld' || localName === 'br') {
+                let rPr = null;
+                for (let j = 0; j < el.childNodes.length; j++) {
+                    const child = el.childNodes[j];
+                    if (child.nodeType === 1) {
+                        const childLocalName = child.localName || child.tagName.split(':').pop();
+                        if (childLocalName === 'rPr') {
+                            rPr = child;
+                            break;
+                        }
+                    }
+                }
+                if (!rPr) {
+                    rPr = xmlDoc.createElementNS(nsA, 'a:rPr');
+                    el.insertBefore(rPr, el.firstChild);
+                }
+                applyLnToRPr(rPr);
+            } else if (localName === 'endParaRPr' || localName === 'defRPr') {
+                applyLnToRPr(el);
+            }
+        }
+
+        const updatedXmlStr = serializer.serializeToString(xmlDoc);
+        zip.file(slidePath, updatedXmlStr);
+    });
+
+    const blob = zip.generate({
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    });
+
+    await saveFileWithLocationPicker(blob, `수정_${pptFile.name}`);
+}
+
+/**
+ * PPT 내 텍스트를 찾아 일괄 수정합니다. (형식: "기존단어(새단어), 기존단어2(새단어2)")
+ */
+export async function replaceWordsInPpt(pptFile, replaceRulesStr) {
+    if (!pptFile) throw new Error('PPT 파일이 필요합니다.');
+    if (!replaceRulesStr || !replaceRulesStr.trim()) throw new Error('수정할 단어 규칙을 입력해주세요.');
+
+    const rules = [];
+    const parts = replaceRulesStr.split(',');
+    for (const part of parts) {
+        const trimmed = part.trim();
+        if (!trimmed) continue;
+        const match = trimmed.match(/^(.+?)\((.+?)\)$/);
+        if (match) {
+            rules.push({ oldWord: match[1].trim(), newWord: match[2].trim() });
+        } else {
+            throw new Error(`규칙 형식이 올바르지 않습니다: "${trimmed}" (올바른 형식 예: 애플리케이션(어플리케이션))`);
+        }
+    }
+
+    if (rules.length === 0) throw new Error('유효한 치환 규칙이 없습니다.');
+
+    const arrayBuffer = await pptFile.arrayBuffer();
+    const zip = new PizZip(arrayBuffer);
+    const allFiles = Object.keys(zip.files);
+
+    const targetFiles = allFiles.filter(p => p.endsWith('.xml') && p.startsWith('ppt/'));
+
+    const parser = new DOMParser();
+    const serializer = new XMLSerializer();
+    let hasChanges = false;
+
+    targetFiles.forEach(slidePath => {
+        let slideXmlStr = zip.file(slidePath).asText();
+        
+        // 최적화: 치환할 단어가 XML 원본 문자열에 하나라도 있는지 빠른 검사
+        // (파워포인트가 단어를 쪼개서 저장한 경우는 이 단순 치환 방식으로는 잡기 어려우나, 대부분의 일반 텍스트에 적용 가능)
+        let containsAny = false;
+        for (const rule of rules) {
+            if (slideXmlStr.includes(rule.oldWord)) {
+                containsAny = true;
+                break;
+            }
+        }
+        
+        if (!containsAny) return;
+
+        const xmlDoc = parser.parseFromString(slideXmlStr, 'application/xml');
+        const parserError = xmlDoc.getElementsByTagName('parsererror');
+        if (parserError.length > 0) return;
+
+        let fileChanged = false;
+        const allElements = xmlDoc.getElementsByTagName('*');
+        
+        for (let i = 0; i < allElements.length; i++) {
+            const el = allElements[i];
+            if (el.nodeType !== 1) continue;
+            
+            const localName = el.localName || el.tagName.split(':').pop();
+            if (localName === 't') {
+                let text = el.textContent;
+                let originalText = text;
+                
+                for (const rule of rules) {
+                    text = text.split(rule.oldWord).join(rule.newWord);
+                }
+                
+                if (text !== originalText) {
+                    el.textContent = text;
+                    fileChanged = true;
+                    hasChanges = true;
+                }
+            }
+        }
+
+        if (fileChanged) {
+            zip.file(slidePath, serializer.serializeToString(xmlDoc));
+        }
+    });
+
+    if (!hasChanges) {
+        throw new Error('PPT 파일 내에서 해당 단어를 찾을 수 없거나 이미 모두 수정되었습니다.');
+    }
+
+    const blob = zip.generate({
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    });
+
+    await saveFileWithLocationPicker(blob, `단어수정_${pptFile.name}`);
+}
+
+/**
+ * pptxgenjs로 생성한 슬라이드(aiGenBlob)를 사용자가 업로드한 원본 마스터(masterFile)에 덮어씌웁니다.
+ * 원본의 배경, 로고, 테마 색상(slideMaster, slideLayout)은 유지하면서,
+ * 내용물은 AI가 새로 그린 슬라이드들로 완전히 교체하는 하이브리드 병합 엔진입니다.
+ */
+export async function injectSlidesIntoMaster(masterFile, aiGenBlob) {
+    const masterBuffer = await masterFile.arrayBuffer();
+    const aiGenBuffer = await aiGenBlob.arrayBuffer();
+
+    const zipMaster = new PizZip(masterBuffer);
+    const zipAi = new PizZip(aiGenBuffer);
+
+    // 1. 마스터에서 사용할 기준 레이아웃 타겟 탐색 (기본적으로 첫 번째 슬라이드의 레이아웃 사용)
+    let masterLayoutTarget = '../slideLayouts/slideLayout1.xml';
+    const firstSlideRelsStr = zipMaster.file('ppt/slides/_rels/slide1.xml.rels')?.asText();
+    if (firstSlideRelsStr) {
+        const layoutMatch = firstSlideRelsStr.match(/Target="([^"]*slideLayout[^"]*)"/);
+        if (layoutMatch) {
+            masterLayoutTarget = layoutMatch[1];
+        }
+    }
+
+    // 2. 마스터의 기존 슬라이드 모두 제거
+    let ctXml = zipMaster.file('[Content_Types].xml').asText();
+    ctXml = ctXml.replace(/<Override PartName="\/ppt\/slides\/slide\d+\.xml"[^>]*>\s*/g, '');
+
+    let presRelsXml = zipMaster.file('ppt/_rels/presentation.xml.rels').asText();
+    presRelsXml = presRelsXml.replace(/<Relationship Id="[^"]+" Type="http:\/\/schemas\.openxmlformats\.org\/officeDocument\/2006\/relationships\/slide" Target="[^"]+"\s*\/>\s*/g, '');
+
+    let presXml = zipMaster.file('ppt/presentation.xml').asText();
+    presXml = presXml.replace(/<p:sldIdLst>[\s\S]*?<\/p:sldIdLst>/, '<p:sldIdLst></p:sldIdLst>');
+
+    // 기존 슬라이드 파일 삭제
+    for (const key of Object.keys(zipMaster.files)) {
+        if (key.startsWith('ppt/slides/slide') || key.startsWith('ppt/slides/_rels/slide')) {
+            zipMaster.remove(key);
+        }
+    }
+
+    // 3. AI가 생성한 슬라이드들을 마스터에 주입
+    const aiSlides = Object.keys(zipAi.files).filter(k => k.match(/^ppt\/slides\/slide\d+\.xml$/));
+    
+    let rIdCounter = 1000;
+    let sldIdCounter = 2000;
+    
+    let newOverrides = '';
+    let newPresRels = '';
+    let newSldIds = '';
+
+    for (let i = 1; i <= aiSlides.length; i++) {
+        const slidePath = `ppt/slides/slide${i}.xml`;
+        const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
+        
+        const slideStr = zipAi.file(slidePath)?.asText();
+        let relsStr = zipAi.file(relsPath)?.asText();
+        
+        if (!slideStr || !relsStr) continue;
+
+        // 레이아웃 참조를 마스터의 레이아웃으로 변경
+        relsStr = relsStr.replace(/Target="([^"]*slideLayout[^"]*)"/, `Target="${masterLayoutTarget}"`);
+        
+        zipMaster.file(slidePath, slideStr);
+        zipMaster.file(relsPath, relsStr);
+
+        const rId = `rId${rIdCounter++}`;
+        const sldId = sldIdCounter++;
+
+        newOverrides += `<Override PartName="/${slidePath}" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`;
+        newPresRels += `<Relationship Id="${rId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${i}.xml"/>`;
+        newSldIds += `<p:sldId id="${sldId}" r:id="${rId}"/>`;
+    }
+
+    // 변경된 메타데이터 갱신
+    ctXml = ctXml.replace('</Types>', `${newOverrides}</Types>`);
+    zipMaster.file('[Content_Types].xml', ctXml);
+
+    presRelsXml = presRelsXml.replace('</Relationships>', `${newPresRels}</Relationships>`);
+    zipMaster.file('ppt/_rels/presentation.xml.rels', presRelsXml);
+
+    presXml = presXml.replace('<p:sldIdLst></p:sldIdLst>', `<p:sldIdLst>${newSldIds}</p:sldIdLst>`);
+    
+    // 슬라이드 개수 업데이트
+    const appXmlPath = 'docProps/app.xml';
+    if (zipMaster.files[appXmlPath]) {
+        let appXml = zipMaster.file(appXmlPath).asText();
+        appXml = appXml.replace(/<Slides>\d+<\/Slides>/, `<Slides>${aiSlides.length}</Slides>`);
+        zipMaster.file(appXmlPath, appXml);
+    }
+    
+    zipMaster.file('ppt/presentation.xml', presXml);
+
+    const mergedBlob = zipMaster.generate({
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    });
+
+    return mergedBlob;
+}
+
