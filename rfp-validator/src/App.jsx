@@ -74,9 +74,9 @@ function App() {
       'law-mcp': 'AI 법률 자문(MCP)',
       erd: 'AI ERD 설계',
       ppt: 'PPT 생성(표준산출물)',
-      aippt: 'AI PPT 디자이너',
       library: '참고자료 라이브러리',
       meeting: 'AI 회의록 생성',
+      aippt: '(작업중)AI PPT 디자이너',
     };
     gaEvent('page_view', {
       page_title: tabLabels[activeTab] || activeTab,
@@ -134,10 +134,10 @@ function App() {
     { id: 'law', label: 'AI 법률 자문(제미나이)', icon: MessageSquare, color: 'var(--success-color)' },
     { id: 'law-mcp', label: 'AI 법률 자문(MCP)', icon: MessageSquare, color: 'var(--accent-purple)' },
     { id: 'erd', label: 'AI ERD 설계', icon: Database, color: 'var(--warning-color)' },
-    { id: 'aippt', label: 'AI PPT 디자이너(작업중)', icon: Presentation, color: '#ec4899' },
     { id: 'ppt', label: 'PPT 생성(표준산출물)', icon: FileText, color: '#f97316' },
     { id: 'meeting', label: 'AI 회의록 생성', icon: Mic2, color: '#8b5cf6' },
     { id: 'library', label: '참고자료 라이브러리', icon: Activity, color: '#64748b' },
+    { id: 'aippt', label: '(작업중)AI PPT 디자이너', icon: Presentation, color: '#ec4899' },
   ];
 
   const activeTabData = tabs.find(t => t.id === activeTab);
