@@ -1,9 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { Presentation, FileSpreadsheet, Upload, X, Loader2, Info, Settings, Download, Play, FileDown } from 'lucide-react';
-import { parseExcelData, generatePptFromTemplate, applyTextDesignToPpt, replaceWordsInPpt } from '../utils/pptExporter';
+import { parseExcelData, generatePptFromTemplate, processPptBatch } from '../utils/pptExporter';
 
 export default function PptGenerator() {
-    const [activeTab, setActiveTab] = useState('excel_mapping'); // 'excel_mapping' or 'text_design'
+    const [activeTab, setActiveTab] = useState('excel_mapping'); // 'excel_mapping' or 'batch_edit'
     
     // 엑셀 매핑 관련 State
     const [excelFile, setExcelFile] = useState(null);
@@ -19,17 +19,13 @@ export default function PptGenerator() {
     const excelInputRef = useRef(null);
     const pptInputRef = useRef(null);
 
-    // 텍스트 디자인 일괄 변경 관련 State
-    const [modifyPptFile, setModifyPptFile] = useState(null);
-    const [targetText, setTargetText] = useState('');
-    const [isModifying, setIsModifying] = useState(false);
-    const [isDraggingModify, setIsDraggingModify] = useState(false);
-
-    // 단어 일괄 수정 관련 State
-    const [replacePptFile, setReplacePptFile] = useState(null);
+    // PPT 일괄 편집 (단어 수정 + 디자인 변경) 관련 State
+    const [batchPptFiles, setBatchPptFiles] = useState([]);
     const [replaceRules, setReplaceRules] = useState('');
-    const [isReplacing, setIsReplacing] = useState(false);
-    const [isDraggingReplace, setIsDraggingReplace] = useState(false);
+    const [applyDesignChecked, setApplyDesignChecked] = useState(false);
+    const [designTargetText, setDesignTargetText] = useState('');
+    const [isProcessingBatch, setIsProcessingBatch] = useState(false);
+    const [isDraggingBatch, setIsDraggingBatch] = useState(false);
 
     const [errorMsg, setErrorMsg] = useState(null);
     const [successMsg, setSuccessMsg] = useState(null);
@@ -96,40 +92,32 @@ export default function PptGenerator() {
         }
     };
 
-    const handleModifyPptDragEvents = {
+    const handleBatchPptDragEvents = {
         onDragOver: (e) => { e.preventDefault(); e.stopPropagation(); },
-        onDragEnter: (e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingModify(true); },
-        onDragLeave: (e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingModify(false); },
+        onDragEnter: (e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingBatch(true); },
+        onDragLeave: (e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingBatch(false); },
         onDrop: (e) => {
-            e.preventDefault(); e.stopPropagation(); setIsDraggingModify(false);
-            const file = e.dataTransfer.files[0];
-            if (file) {
-                const ext = file.name.split('.').pop().toLowerCase();
-                if (ext !== 'pptx') {
-                    setErrorMsg('PPT 파일은 .pptx 확장자만 지원합니다.');
-                    return;
-                }
-                setModifyPptFile(file);
+            e.preventDefault(); e.stopPropagation(); setIsDraggingBatch(false);
+            const files = Array.from(e.dataTransfer.files);
+            const validFiles = files.filter(f => f.name.toLowerCase().endsWith('.pptx'));
+            if (validFiles.length > 0) {
+                setBatchPptFiles(prev => [...prev, ...validFiles]);
+            } else {
+                setErrorMsg('PPT 파일(.pptx)만 지원합니다.');
             }
         }
     };
 
-    const handleReplacePptDragEvents = {
-        onDragOver: (e) => { e.preventDefault(); e.stopPropagation(); },
-        onDragEnter: (e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingReplace(true); },
-        onDragLeave: (e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingReplace(false); },
-        onDrop: (e) => {
-            e.preventDefault(); e.stopPropagation(); setIsDraggingReplace(false);
-            const file = e.dataTransfer.files[0];
-            if (file) {
-                const ext = file.name.split('.').pop().toLowerCase();
-                if (ext !== 'pptx') {
-                    setErrorMsg('PPT 파일은 .pptx 확장자만 지원합니다.');
-                    return;
-                }
-                setReplacePptFile(file);
-            }
+    const handleBatchFileChange = (e) => {
+        const files = Array.from(e.target.files);
+        const validFiles = files.filter(f => f.name.toLowerCase().endsWith('.pptx'));
+        if (validFiles.length > 0) {
+            setBatchPptFiles(prev => [...prev, ...validFiles]);
         }
+    };
+
+    const removeBatchFile = (indexToRemove) => {
+        setBatchPptFiles(prev => prev.filter((_, idx) => idx !== indexToRemove));
     };
 
     const handleGenerate = async () => {
@@ -160,49 +148,101 @@ export default function PptGenerator() {
         }
     };
 
-    // 텍스트 디자인 변경 핸들러
-    const handleModifyDesign = async () => {
-        if (!modifyPptFile) {
-            setErrorMsg('PPT 파일을 등록해주세요.');
+    // 일괄 편집 핸들러 (단어 수정 + 디자인 적용 + 다중 파일 + 폴더 지정)
+    const handleBatchProcess = async () => {
+        if (batchPptFiles.length === 0) {
+            setErrorMsg('PPT 파일을 1개 이상 등록해주세요.');
             return;
         }
-        setErrorMsg(null);
-        setSuccessMsg(null);
-        setIsModifying(true);
-        await new Promise(r => setTimeout(r, 800));
-        try {
-            await applyTextDesignToPpt(modifyPptFile, targetText.trim());
-            setSuccessMsg('텍스트 디자인이 일괄 적용된 PPT 파일이 다운로드되었습니다.');
-            setModifyPptFile(null);
-            setTargetText('');
-        } catch (err) {
-            console.error(err);
-            setErrorMsg(`변환 중 오류 발생: ${err.message || '알 수 없는 오류'}`);
-        } finally {
-            setIsModifying(false);
-        }
-    };
 
-    // 텍스트 단어 일괄 수정 핸들러
-    const handleReplaceWords = async () => {
-        if (!replacePptFile) {
-            setErrorMsg('PPT 파일을 등록해주세요.');
+        let parsedRules = [];
+        if (replaceRules.trim()) {
+            const parts = replaceRules.split(',');
+            for (const part of parts) {
+                const trimmed = part.trim();
+                if (!trimmed) continue;
+                const match = trimmed.match(/^(.+?)\((.+?)\)$/);
+                if (match) {
+                    parsedRules.push({ oldWord: match[1].trim(), newWord: match[2].trim() });
+                } else {
+                    setErrorMsg(`규칙 형식이 올바르지 않습니다: "${trimmed}" (예: 기존단어(새단어))`);
+                    return;
+                }
+            }
+        }
+
+        if (parsedRules.length === 0 && !applyDesignChecked) {
+            setErrorMsg('적용할 단어 수정 규칙이나 텍스트 디자인 변경을 선택해주세요.');
             return;
         }
+
         setErrorMsg(null);
         setSuccessMsg(null);
-        setIsReplacing(true);
-        await new Promise(r => setTimeout(r, 800));
+        setIsProcessingBatch(true);
+
         try {
-            await replaceWordsInPpt(replacePptFile, replaceRules);
-            setSuccessMsg('텍스트 단어가 일괄 수정된 PPT 파일이 다운로드되었습니다.');
-            setReplacePptFile(null);
-            setReplaceRules('');
+            let directoryHandle = null;
+            if ('showDirectoryPicker' in window) {
+                try {
+                    directoryHandle = await window.showDirectoryPicker({
+                        id: 'ppt-batch-output',
+                        mode: 'readwrite',
+                        startIn: 'downloads'
+                    });
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.error('Directory Picker Error:', err);
+                    } else {
+                        // 취소한 경우 중단
+                        setIsProcessingBatch(false);
+                        return;
+                    }
+                }
+            }
+
+            let successCount = 0;
+
+            for (const file of batchPptFiles) {
+                try {
+                    const modifiedBlob = await processPptBatch(file, {
+                        replaceRules: parsedRules,
+                        applyDesign: applyDesignChecked,
+                        targetText: designTargetText
+                    });
+
+                    const fileName = `수정_${file.name}`;
+                    
+                    if (directoryHandle) {
+                        const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(modifiedBlob);
+                        await writable.close();
+                    } else {
+                        // Fallback: 일반 다운로드
+                        const { saveAs } = await import('file-saver');
+                        saveAs(modifiedBlob, fileName);
+                    }
+                    successCount++;
+                } catch (fileErr) {
+                    console.error(`Error processing ${file.name}:`, fileErr);
+                    // 개별 파일 에러 시 다음 파일로 계속 진행 (사용자 알림 필요 시 추가 가능)
+                }
+            }
+
+            if (successCount > 0) {
+                setSuccessMsg(`성공적으로 ${successCount}개의 파일이 일괄 편집되어 저장되었습니다.`);
+                setBatchPptFiles([]);
+                setReplaceRules('');
+                setApplyDesignChecked(false);
+                setDesignTargetText('');
+            } else {
+                setErrorMsg('처리된 파일이 없습니다. 변경 대상 텍스트가 존재하는지 확인해주세요.');
+            }
         } catch (err) {
             console.error(err);
-            setErrorMsg(`변환 중 오류 발생: ${err.message || '알 수 없는 오류'}`);
+            setErrorMsg(`작업 중 오류 발생: ${err.message || '알 수 없는 오류'}`);
         } finally {
-            setIsReplacing(false);
+            setIsProcessingBatch(false);
         }
     };
 
@@ -241,30 +281,17 @@ export default function PptGenerator() {
                         엑셀 데이터 매핑 생성
                     </button>
                     <button 
-                        onClick={() => { setActiveTab('text_design'); setErrorMsg(null); setSuccessMsg(null); }}
+                        onClick={() => { setActiveTab('batch_edit'); setErrorMsg(null); setSuccessMsg(null); }}
                         className="interactive"
                         style={{
                             padding: '10px 20px', borderRadius: '8px', cursor: 'pointer',
-                            background: activeTab === 'text_design' ? 'rgba(168, 85, 247, 0.1)' : 'transparent',
-                            border: '1px solid ' + (activeTab === 'text_design' ? '#a855f7' : 'transparent'),
-                            color: activeTab === 'text_design' ? '#c084fc' : 'var(--text-secondary)',
+                            background: activeTab === 'batch_edit' ? 'rgba(236, 72, 153, 0.1)' : 'transparent',
+                            border: '1px solid ' + (activeTab === 'batch_edit' ? '#ec4899' : 'transparent'),
+                            color: activeTab === 'batch_edit' ? '#f472b6' : 'var(--text-secondary)',
                             fontWeight: 600, fontSize: '14px', transition: 'all 0.2s'
                         }}
                     >
-                        텍스트 디자인 일괄 변경
-                    </button>
-                    <button 
-                        onClick={() => { setActiveTab('word_replace'); setErrorMsg(null); setSuccessMsg(null); }}
-                        className="interactive"
-                        style={{
-                            padding: '10px 20px', borderRadius: '8px', cursor: 'pointer',
-                            background: activeTab === 'word_replace' ? 'rgba(236, 72, 153, 0.1)' : 'transparent',
-                            border: '1px solid ' + (activeTab === 'word_replace' ? '#ec4899' : 'transparent'),
-                            color: activeTab === 'word_replace' ? '#f472b6' : 'var(--text-secondary)',
-                            fontWeight: 600, fontSize: '14px', transition: 'all 0.2s'
-                        }}
-                    >
-                        단어 일괄 수정
+                        PPT 텍스트/디자인 일괄 편집
                     </button>
                 </div>
 
@@ -442,145 +469,65 @@ export default function PptGenerator() {
                             </button>
                         </div>
                     </div>
-                ) : activeTab === 'text_design' ? (
+                ) : activeTab === 'batch_edit' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                        {/* 텍스트 디자인 일괄 변경 UI */}
+                        {/* 일괄 편집 (다중 파일) UI */}
                         <div 
-                            {...handleModifyPptDragEvents}
+                            {...handleBatchPptDragEvents}
                             style={{ 
-                                border: `2px dashed ${isDraggingModify ? '#a855f7' : 'rgba(168, 85, 247, 0.3)'}`, 
+                                border: `2px dashed ${isDraggingBatch ? '#ec4899' : 'rgba(236, 72, 153, 0.3)'}`, 
                                 borderRadius: '12px', padding: '24px',
-                                background: isDraggingModify ? 'rgba(168, 85, 247, 0.1)' : 'rgba(168, 85, 247, 0.05)', 
+                                background: isDraggingBatch ? 'rgba(236, 72, 153, 0.1)' : 'rgba(236, 72, 153, 0.05)', 
                                 display: 'flex', flexDirection: 'column', gap: '16px',
-                                transition: 'all 0.2s ease', cursor: isDraggingModify ? 'copy' : 'default'
-                            }}
-                        >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Presentation size={20} color="#c084fc" />
-                                <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>1. 원본 PPT 파일(.pptx) 등록</h3>
-                            </div>
-                            <input
-                                type="file"
-                                accept=".pptx"
-                                onChange={(e) => setModifyPptFile(e.target.files[0])}
-                                style={{ display: 'none' }}
-                                id="modify-ppt-upload"
-                            />
-                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                                <button
-                                    onClick={() => document.getElementById('modify-ppt-upload').click()}
-                                    className="interactive"
-                                    style={{
-                                        display: 'flex', alignItems: 'center', gap: '8px',
-                                        padding: '10px 16px', borderRadius: '8px', cursor: 'pointer',
-                                        background: 'var(--bg-secondary)', border: '1px solid var(--panel-border)',
-                                        color: 'var(--text-primary)', fontWeight: 600, fontSize: '13px'
-                                    }}
-                                >
-                                    <Upload size={16} /> PPT 파일 찾기
-                                </button>
-                                {modifyPptFile && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.2)', padding: '6px 12px', borderRadius: '6px', fontSize: '13px', border: '1px solid #a855f7' }}>
-                                        <span style={{ color: '#c084fc' }}>✔</span>
-                                        {modifyPptFile.name}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <div style={{ 
-                            border: '1px solid var(--panel-border)', 
-                            borderRadius: '12px', padding: '24px',
-                            background: 'rgba(255, 255, 255, 0.02)', 
-                            display: 'flex', flexDirection: 'column', gap: '16px'
-                        }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Info size={20} color="#c084fc" />
-                                <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>2. 변경할 텍스트 지정</h3>
-                            </div>
-                            <input
-                                type="text"
-                                placeholder="디자인을 변경할 텍스트를 입력하세요 (예: 제목, 회사명 등)"
-                                value={targetText}
-                                onChange={(e) => setTargetText(e.target.value)}
-                                style={{
-                                    width: '100%', padding: '12px 16px', borderRadius: '8px',
-                                    background: 'var(--bg-secondary)', border: '1px solid var(--panel-border)',
-                                    color: 'var(--text-primary)', fontSize: '14px'
-                                }}
-                            />
-                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                                💡 입력한 텍스트를 포함하는 모든 슬라이드의 텍스트 상자에 <strong>텍스트 윤곽선(실선, 흰색, 투명도 100%)</strong> 디자인이 일괄 적용됩니다.
-                            </div>
-                        </div>
-
-                        <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
-                            <button
-                                className="interactive"
-                                onClick={handleModifyDesign}
-                                disabled={!modifyPptFile || isModifying}
-                                style={{
-                                    width: '100%',
-                                    padding: '16px',
-                                    background: (!modifyPptFile || isModifying) ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #a855f7, #3b82f6)',
-                                    color: (!modifyPptFile || isModifying) ? 'var(--text-muted)' : 'white',
-                                    border: 'none',
-                                    borderRadius: '12px',
-                                    fontSize: '16px',
-                                    fontWeight: 700,
-                                    cursor: (!modifyPptFile || isModifying) ? 'not-allowed' : 'pointer',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
-                                }}
-                            >
-                                {isModifying ? (
-                                    <><Loader2 size={20} className="animate-spin" /> 디자인 적용 중...</>
-                                ) : (
-                                    <><Play size={20} /> 디자인 일괄 적용 및 생성</>
-                                )}
-                            </button>
-                        </div>
-                    </div>
-                ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                        {/* 단어 일괄 수정 UI */}
-                        <div 
-                            {...handleReplacePptDragEvents}
-                            style={{ 
-                                border: `2px dashed ${isDraggingReplace ? '#ec4899' : 'rgba(236, 72, 153, 0.3)'}`, 
-                                borderRadius: '12px', padding: '24px',
-                                background: isDraggingReplace ? 'rgba(236, 72, 153, 0.1)' : 'rgba(236, 72, 153, 0.05)', 
-                                display: 'flex', flexDirection: 'column', gap: '16px',
-                                transition: 'all 0.2s ease', cursor: isDraggingReplace ? 'copy' : 'default'
+                                transition: 'all 0.2s ease', cursor: isDraggingBatch ? 'copy' : 'default'
                             }}
                         >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <Presentation size={20} color="#f472b6" />
-                                <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>1. 원본 PPT 파일(.pptx) 등록</h3>
+                                <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>1. 원본 PPT 파일(.pptx) 다중 등록</h3>
                             </div>
                             <input
                                 type="file"
                                 accept=".pptx"
-                                onChange={(e) => setReplacePptFile(e.target.files[0])}
+                                multiple
+                                onChange={handleBatchFileChange}
                                 style={{ display: 'none' }}
-                                id="replace-ppt-upload"
+                                id="batch-ppt-upload"
                             />
-                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                                <button
-                                    onClick={() => document.getElementById('replace-ppt-upload').click()}
-                                    className="interactive"
-                                    style={{
-                                        display: 'flex', alignItems: 'center', gap: '8px',
-                                        padding: '10px 16px', borderRadius: '8px', cursor: 'pointer',
-                                        background: 'var(--bg-secondary)', border: '1px solid var(--panel-border)',
-                                        color: 'var(--text-primary)', fontWeight: 600, fontSize: '13px'
-                                    }}
-                                >
-                                    <Upload size={16} /> PPT 파일 찾기
-                                </button>
-                                {replacePptFile && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.2)', padding: '6px 12px', borderRadius: '6px', fontSize: '13px', border: '1px solid #ec4899' }}>
-                                        <span style={{ color: '#f472b6' }}>✔</span>
-                                        {replacePptFile.name}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <div>
+                                    <button
+                                        onClick={() => document.getElementById('batch-ppt-upload').click()}
+                                        className="interactive"
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: '8px',
+                                            padding: '10px 16px', borderRadius: '8px', cursor: 'pointer',
+                                            background: 'var(--bg-secondary)', border: '1px solid var(--panel-border)',
+                                            color: 'var(--text-primary)', fontWeight: 600, fontSize: '13px'
+                                        }}
+                                    >
+                                        <Upload size={16} /> PPT 파일(들) 찾기
+                                    </button>
+                                </div>
+                                
+                                {batchPptFiles.length > 0 && (
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                                        {batchPptFiles.map((file, idx) => (
+                                            <div key={idx} style={{ 
+                                                display: 'flex', alignItems: 'center', gap: '6px', 
+                                                background: 'rgba(0,0,0,0.2)', padding: '4px 10px', 
+                                                borderRadius: '6px', fontSize: '12.5px', border: '1px solid #ec4899' 
+                                            }}>
+                                                <span style={{ color: '#f472b6' }}>✔</span>
+                                                <span style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
+                                                <button 
+                                                    onClick={() => removeBatchFile(idx)}
+                                                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px', display: 'flex' }}
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
                             </div>
@@ -590,57 +537,91 @@ export default function PptGenerator() {
                             border: '1px solid var(--panel-border)', 
                             borderRadius: '12px', padding: '24px',
                             background: 'rgba(255, 255, 255, 0.02)', 
-                            display: 'flex', flexDirection: 'column', gap: '16px'
+                            display: 'flex', flexDirection: 'column', gap: '20px'
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Info size={20} color="#f472b6" />
-                                <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>2. 수정할 단어 규칙 입력</h3>
+                                <Settings size={20} color="#f472b6" />
+                                <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>2. 일괄 편집 옵션 설정</h3>
                             </div>
-                            <input
-                                type="text"
-                                placeholder="예: 애플리케이션(어플리케이션), AI(인공지능)"
-                                value={replaceRules}
-                                onChange={(e) => setReplaceRules(e.target.value)}
-                                style={{
-                                    width: '100%', padding: '12px 16px', borderRadius: '8px',
-                                    background: 'var(--bg-secondary)', border: '1px solid var(--panel-border)',
-                                    color: 'var(--text-primary)', fontSize: '14px'
-                                }}
-                            />
-                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                                💡 형식: <code>기존단어(새로운단어)</code><br/>
-                                복수의 단어를 수정하려면 쉼표(,)로 구분하여 입력하세요.<br/>
-                                예시: <code>애플리케이션(어플리케이션), AI(인공지능), 테스트(검증)</code>
+                            
+                            {/* 옵션 1: 단어 수정 */}
+                            <div style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                                <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '8px', color: 'var(--text-primary)' }}>
+                                    옵션 A: 수정할 단어 규칙 입력 (선택)
+                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="예: 애플리케이션(어플리케이션), AI(인공지능)"
+                                    value={replaceRules}
+                                    onChange={(e) => setReplaceRules(e.target.value)}
+                                    style={{
+                                        width: '100%', padding: '12px 16px', borderRadius: '8px',
+                                        background: 'rgba(0,0,0,0.2)', border: '1px solid var(--panel-border)',
+                                        color: 'var(--text-primary)', fontSize: '14px', marginBottom: '8px'
+                                    }}
+                                />
+                                <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                                    형식: <code>기존단어(새로운단어)</code> (복수는 쉼표로 구분)
+                                </div>
+                            </div>
+
+                            {/* 옵션 2: 텍스트 디자인 */}
+                            <div style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: '8px', border: '1px solid var(--panel-border)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={applyDesignChecked}
+                                        onChange={(e) => setApplyDesignChecked(e.target.checked)}
+                                        style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#ec4899' }}
+                                    />
+                                    옵션 B: 텍스트 디자인 일괄 변경 적용 (흰색 실선, 투명도 100%)
+                                </label>
+                                
+                                {applyDesignChecked && (
+                                    <div className="animate-slide-up" style={{ paddingLeft: '28px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        <input
+                                            type="text"
+                                            placeholder="특정 단어가 포함된 텍스트 박스만 변경할 경우 입력 (비워두면 전체 적용)"
+                                            value={designTargetText}
+                                            onChange={(e) => setDesignTargetText(e.target.value)}
+                                            style={{
+                                                width: '100%', padding: '10px 14px', borderRadius: '8px',
+                                                background: 'rgba(0,0,0,0.2)', border: '1px solid var(--panel-border)',
+                                                color: 'var(--text-primary)', fontSize: '13.5px'
+                                            }}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         </div>
 
                         <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
                             <button
                                 className="interactive"
-                                onClick={handleReplaceWords}
-                                disabled={!replacePptFile || isReplacing || !replaceRules.trim()}
+                                onClick={handleBatchProcess}
+                                disabled={batchPptFiles.length === 0 || isProcessingBatch || (!replaceRules.trim() && !applyDesignChecked)}
                                 style={{
                                     width: '100%',
                                     padding: '16px',
-                                    background: (!replacePptFile || isReplacing || !replaceRules.trim()) ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #ec4899, #8b5cf6)',
-                                    color: (!replacePptFile || isReplacing || !replaceRules.trim()) ? 'var(--text-muted)' : 'white',
+                                    background: (batchPptFiles.length === 0 || isProcessingBatch || (!replaceRules.trim() && !applyDesignChecked)) ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #ec4899, #8b5cf6)',
+                                    color: (batchPptFiles.length === 0 || isProcessingBatch || (!replaceRules.trim() && !applyDesignChecked)) ? 'var(--text-muted)' : 'white',
                                     border: 'none',
                                     borderRadius: '12px',
                                     fontSize: '16px',
                                     fontWeight: 700,
-                                    cursor: (!replacePptFile || isReplacing || !replaceRules.trim()) ? 'not-allowed' : 'pointer',
+                                    cursor: (batchPptFiles.length === 0 || isProcessingBatch || (!replaceRules.trim() && !applyDesignChecked)) ? 'not-allowed' : 'pointer',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
                                 }}
                             >
-                                {isReplacing ? (
-                                    <><Loader2 size={20} className="animate-spin" /> 단어 수정 적용 중...</>
+                                {isProcessingBatch ? (
+                                    <><Loader2 size={20} className="animate-spin" /> 폴더에 순차적으로 적용 및 저장 중...</>
                                 ) : (
-                                    <><Play size={20} /> 텍스트 단어 일괄 수정 및 생성</>
+                                    <><Play size={20} /> 저장할 폴더 선택 및 일괄 편집 실행</>
                                 )}
                             </button>
                         </div>
                     </div>
-                )}
+                ) : null}
             </div>
         </div>
     );
