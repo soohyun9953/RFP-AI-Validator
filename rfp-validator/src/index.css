@@ -1,24 +1,26 @@
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-  --bg-dark: #050505;
-  --bg-primary: #0a0a0a;
-  --bg-secondary: #0f0f0f;
+  --bg-dark: #07090e;
+  --bg-primary: #0b0e14;
+  --bg-secondary: #121620;
   
-  --glass-bg: rgba(10, 10, 10, 0.7);
+  --glass-bg: rgba(15, 17, 26, 0.7);
   --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-outline: rgba(255, 255, 255, 0.04);
+  --glass-outline: rgba(168, 85, 247, 0.15);
   --glass-blur: blur(24px);
 
   --accent-blue: #3b82f6;
   --accent-purple: #a855f7;
+  --accent-gold: #facc15;
   --accent-green: #10b981;
   --accent-amber: #f59e0b;
   --accent-rose: #f43f5e;
 
   --text-primary: #ffffff;
-  --text-secondary: #9ca3af;
-  --text-muted: #6b7280;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
 
   --success-color: #22c55e;
   --danger-color: #ef4444;
@@ -27,7 +29,7 @@
   --sidebar-width: 280px;
   --sidebar-collapsed-width: 84px;
   --header-height: 72px;
-  --font-main: 'Inter', system-ui, sans-serif;
+  --font-main: 'Pretendard', 'Inter', system-ui, sans-serif;
 }
 
 /* --- Styled Scrollbars --- */
@@ -82,7 +84,8 @@ body {
   width: 100vw;
   height: 100vh;
   background: radial-gradient(circle at 50% -20%, rgba(168, 85, 247, 0.15), transparent 60%),
-              radial-gradient(circle at -10% 50%, rgba(59, 130, 246, 0.1), transparent 50%);
+              radial-gradient(circle at -10% 50%, rgba(59, 130, 246, 0.1), transparent 50%),
+              var(--bg-dark);
 }
 
 /* --- Sidebar --- */
@@ -158,7 +161,7 @@ body {
   font-size: 18px;
   font-weight: 800;
   letter-spacing: -0.5px;
-  background: linear-gradient(to right, #fff, #9ca3af);
+  background: linear-gradient(to right, #ffffff, #93c5fd);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -515,4 +518,51 @@ body {
   .logo-text h1 {
     font-size: 16px;
   }
+}
+
+/* --- Light Mode Theme --- */
+.light-mode {
+  --bg-dark: #f8fafc;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f1f5f9;
+  
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(0, 0, 0, 0.1);
+  --glass-outline: rgba(168, 85, 247, 0.2);
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+}
+
+.light-mode.app-container {
+  background: radial-gradient(circle at 50% -20%, rgba(168, 85, 247, 0.05), transparent 60%),
+              radial-gradient(circle at -10% 50%, rgba(59, 130, 246, 0.03), transparent 50%),
+              var(--bg-dark);
+}
+
+.light-mode .sidebar {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.light-mode .content-header {
+  background: rgba(248, 250, 252, 0.6);
+}
+
+.light-mode .nav-item:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.light-mode .nav-item.active {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.light-mode .settings-dropdown {
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.1);
+}
+
+.light-mode .logo-text h1 {
+  background: linear-gradient(to right, #0f172a, #3b82f6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }

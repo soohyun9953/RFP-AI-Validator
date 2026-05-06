@@ -32,7 +32,9 @@ import {
   Trash2,
   Mic2,
   Eye,
-  EyeOff
+  EyeOff,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { processFile } from './utils/fileExtractor';
 
@@ -59,11 +61,16 @@ function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => localStorage.getItem('sidebar_collapsed') === 'true');
   const [showKey, setShowKey] = useState(false); // API 키 보이기/숨기기 토글
+  const [isLightMode, setIsLightMode] = useState(() => localStorage.getItem('theme_mode') === 'light');
 
-  // 사이드바 상태 저장
+  // 사이드바 및 테마 상태 저장
   useEffect(() => {
     localStorage.setItem('sidebar_collapsed', isSidebarCollapsed);
   }, [isSidebarCollapsed]);
+
+  useEffect(() => {
+    localStorage.setItem('theme_mode', isLightMode ? 'light' : 'dark');
+  }, [isLightMode]);
 
   // 탭 변경 시 GA 페이지뷰 전송
   useEffect(() => {
@@ -145,7 +152,7 @@ function App() {
   const keyCount = apiKey.split(',').filter(k => k.trim().startsWith('AIza') || k.trim().startsWith('AQ.')).length;
 
   return (
-    <div className={`app-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`app-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''} ${isLightMode ? 'light-mode' : ''}`}>
       {/* Sidebar */}
       <aside className={`sidebar ${isMobileMenuOpen ? 'mobile-open' : ''} ${isSidebarCollapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
@@ -237,6 +244,14 @@ function App() {
               <span style={{ fontSize: '12px', color: 'var(--accent-blue)', fontWeight: 700, fontFamily: 'monospace' }}>2026. 05. 01 01:10</span>
             </div>
             
+            <button 
+              className="settings-btn" 
+              onClick={() => setIsLightMode(!isLightMode)}
+              title={isLightMode ? "다크 모드로 전환" : "라이트 모드로 전환"}
+            >
+              {isLightMode ? <Moon size={20} /> : <Sun size={20} />}
+            </button>
+
             <button 
               className={`settings-btn ${showSettings ? 'active' : ''}`} 
               onClick={() => setShowSettings(!showSettings)}

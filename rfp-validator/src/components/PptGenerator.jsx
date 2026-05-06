@@ -516,9 +516,9 @@ export default function PptGenerator() {
                                             <div key={idx} style={{ 
                                                 display: 'flex', alignItems: 'center', gap: '6px', 
                                                 background: 'rgba(0,0,0,0.2)', padding: '4px 10px', 
-                                                borderRadius: '6px', fontSize: '12.5px', border: '1px solid #ec4899' 
+                                                borderRadius: '6px', fontSize: '12.5px', border: '1px solid #a855f7' 
                                             }}>
-                                                <span style={{ color: '#f472b6' }}>✔</span>
+                                                <span style={{ color: '#c084fc' }}>✔</span>
                                                 <span style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
                                                 <button 
                                                     onClick={() => removeBatchFile(idx)}
@@ -540,7 +540,7 @@ export default function PptGenerator() {
                             display: 'flex', flexDirection: 'column', gap: '20px'
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Settings size={20} color="#f472b6" />
+                                <Settings size={20} color="#a855f7" />
                                 <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--text-primary)' }}>2. 일괄 편집 옵션 설정</h3>
                             </div>
                             
@@ -572,9 +572,9 @@ export default function PptGenerator() {
                                         type="checkbox" 
                                         checked={applyDesignChecked}
                                         onChange={(e) => setApplyDesignChecked(e.target.checked)}
-                                        style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#ec4899' }}
+                                        style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#a855f7' }}
                                     />
-                                    옵션 B: 텍스트 디자인 일괄 변경 적용 (흰색 실선, 투명도 100%)
+                                    옵션 B: 텍스트 윤곽선 디자인 일괄 변경 적용(흰색 실선, 투명도 100%, 너비 0.75)
                                 </label>
                                 
                                 {applyDesignChecked && (
@@ -603,7 +603,7 @@ export default function PptGenerator() {
                                 style={{
                                     width: '100%',
                                     padding: '16px',
-                                    background: (batchPptFiles.length === 0 || isProcessingBatch || (!replaceRules.trim() && !applyDesignChecked)) ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #ec4899, #8b5cf6)',
+                                    background: (batchPptFiles.length === 0 || isProcessingBatch || (!replaceRules.trim() && !applyDesignChecked)) ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #a855f7, #3b82f6)',
                                     color: (batchPptFiles.length === 0 || isProcessingBatch || (!replaceRules.trim() && !applyDesignChecked)) ? 'var(--text-muted)' : 'white',
                                     border: 'none',
                                     borderRadius: '12px',
