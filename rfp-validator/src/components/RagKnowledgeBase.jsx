@@ -561,7 +561,7 @@ const RagKnowledgeBase = ({ apiKey }) => {
             <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(59, 130, 246, 0.05)', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.1)', display: 'flex', gap: '12px', alignItems: 'center' }}>
                 <Info size={20} color="var(--accent-blue)" />
                 <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                    이 지식베이스는 로컬 데스크탑의 산출물 폴더를 실시간으로 참조합니다. 파일이 추가되거나 변경된 경우 추출 스크립트를 재실행하여 인덱스를 갱신해야 합니다.
+                    RAG 지식베이스는 등록된 문서를 기반으로 AI 분석을 수행합니다. 새로운 문서를 추가하려면 <b>'문서 직접 등록'</b>을 이용하거나, 로컬 폴더의 파일 변경 시 <b>'지식베이스 갱신'</b> 버튼을 클릭하여 인덱스를 업데이트해 주세요.
                 </div>
             </div>
         </div>
