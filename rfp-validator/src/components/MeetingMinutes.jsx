@@ -220,7 +220,8 @@ export default function MeetingMinutes({ apiKey }) {
       setInputMode('text');
       setIsLoading(true);
       try {
-        const text = await processFile(file);
+        const result = await processFile(file);
+        const text = result.text;
         if (!text || text.trim() === '') throw new Error('텍스트를 추출할 수 없습니다.');
         setTextInput(text);
         setAudioFile(null);
@@ -257,7 +258,8 @@ export default function MeetingMinutes({ apiKey }) {
     setExtractError('');
 
     try {
-      const text = await processFile(file);
+      const result = await processFile(file);
+      const text = result.text;
       if (!text || text.trim().length < 10) throw new Error('파일에서 텍스트를 추출하지 못했습니다.');
       const terms = await extractTermsFromText(text, apiKey);
       const existing = new Set(terminology.map(t => t.word.toLowerCase()));

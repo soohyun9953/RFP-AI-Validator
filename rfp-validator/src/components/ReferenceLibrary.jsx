@@ -108,7 +108,8 @@ const ReferenceLibrary = () => {
         setIsProcessing(true);
         setUploadError(null);
         try {
-            const text = await processFile(file);
+            const result = await processFile(file);
+            const text = result.text;
             const title = file.name.replace(/\.[^/.]+$/, "");
             const ext = getFileExtension(file.name);
             

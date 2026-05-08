@@ -20,8 +20,8 @@ function splitTextAtNewline(text) {
         splitIndex = mid;
     }
 
-    const part1 = text.substring(0, splitIndex).trim();
-    const part2 = text.substring(splitIndex).trim();
+    const part1 = String(text || "").substring(0, splitIndex).trim();
+    const part2 = String(text || "").substring(splitIndex).trim();
     return [part1, part2];
 }
 
@@ -72,7 +72,7 @@ function mergeResults(res1, res2, isTypoMode) {
         merged.omissions = combinedMapping
             .filter(req => req.status !== '이행(O)')
             .map(req => ({
-                title: `[ID: ${req.id}] ${(req.requirement || '').substring(0, 30)}...`,
+                title: `[ID: ${req.id}] ${String(req.requirement || '').substring(0, 30)}...`,
                 evidence: req.requirement || '-',
                 reason: req.gap || '구체적인 수행/설계 방안이 누락되었습니다.',
                 recommendation: '해당 요건을 만족하기 위한 구체적인 명세와 실행계획을 산출물에 추가해야 합니다.'
@@ -239,10 +239,10 @@ export async function analyzeDocumentsWithLLM(guidelineText, artifactText, inspe
 [시스템 지시사항]
 ${systemPrompt}
 
-[입력 데이터]${glossaryText ? `\n--- 용어 사전 ---\n${glossaryText.substring(0, 50000)}` : ''}
+[입력 데이터]${glossaryText ? `\n--- 용어 사전 ---\n${String(glossaryText).substring(0, 50000)}` : ''}
 
 --- 산출물 ---
-${(artifactText || '').substring(0, 2000000)}
+${String(artifactText || '').substring(0, 2000000)}
 
 --- 점검 범위 ---
 ${inspectionScope || '없음'}
@@ -250,13 +250,13 @@ ${inspectionScope || '없음'}
 [시스템 지시사항]
 ${systemPrompt}
 
-[입력 데이터]${glossaryText ? `\n--- 용어 사전 ---\n${glossaryText.substring(0, 50000)}` : ''}
+[입력 데이터]${glossaryText ? `\n--- 용어 사전 ---\n${String(glossaryText).substring(0, 50000)}` : ''}
 
 --- 기준 문서 ---
-${(guidelineText || '').substring(0, 500000)}
+${String(guidelineText || '').substring(0, 500000)}
 
 --- 산출물 ---
-${(artifactText || '').substring(0, 2000000)}
+${String(artifactText || '').substring(0, 2000000)}
 
 --- 점검 범위 (해당 내용이 있으면 위주로 더 엄격히 볼 것) ---
 ${inspectionScope || '없음'}
@@ -421,7 +421,7 @@ ${ragContext ? `\n${ragContext}` : ''}
                 parsed.omissions = parsed.requirementMapping
                     .filter(req => req.status !== '이행(O)')
                     .map(req => ({
-                        title: `[ID: ${req.id || 'N/A'}] ${(req.requirement || '').substring(0, 30)}...`,
+                        title: `[ID: ${req.id || 'N/A'}] ${String(req.requirement || '').substring(0, 30)}...`,
                         evidence: req.requirement || '-',
                         reason: req.gap || '구체적인 수행/설계 방안이 누락되었습니다.',
                         recommendation: '해당 요건을 만족하기 위한 구체적인 명세와 실행계획을 산출물에 추가해야 합니다.'

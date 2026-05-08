@@ -698,7 +698,8 @@ const ErdGenerator = ({ apiKey }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const text = await processFile(file);
+      const result = await processFile(file);
+      const text = result.text;
       setInputText(text);
     } catch (err) {
       setError(err.message);

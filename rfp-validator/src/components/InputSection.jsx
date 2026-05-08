@@ -25,8 +25,9 @@ function FileUploadArea({ label, icon: Icon, fileName, onFileSelect, onFileClear
         if (!file) return;
         onFileSelect(file.name, '', true); // 로딩 시작
         try {
-            const text = await processFile(file);
-            onFileSelect(file.name, text, false);
+            const result = await processFile(file);
+            // 객체 전체가 아닌 추출된 텍스트 내용(result.text)만 전달
+            onFileSelect(file.name, result.text, false);
         } catch (err) {
             console.error('파일 처리 오류:', err);
             onFileSelect(file.name, '', false, err.message);
