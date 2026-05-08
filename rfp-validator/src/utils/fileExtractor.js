@@ -91,14 +91,17 @@ export async function extractTextFromPDF(file) {
         if (pageNum < pdf.numPages) allPageLines.push('');
     }
 
-    return allPageLines
-        .reduce((acc, line) => {
-            if (line === '' && acc.length > 0 && acc[acc.length - 1] === '') return acc;
-            acc.push(line);
-            return acc;
-        }, [])
-        .join('\n')
-        .trim();
+    return {
+        text: allPageLines
+            .reduce((acc, line) => {
+                if (line === '' && acc.length > 0 && acc[acc.length - 1] === '') return acc;
+                acc.push(line);
+                return acc;
+            }, [])
+            .join('\n')
+            .trim(),
+        pages: pdf.numPages
+    };
 }
 
 // ── 엑셀 텍스트 추출 ─────────────────────────────────────────
@@ -173,7 +176,10 @@ export async function extractTextFromPPTX(file) {
         }
     }
     
-    return textBlocks.join('\n\n').trim();
+    return {
+        text: textBlocks.join('\n\n').trim(),
+        pages: slideFiles.length
+    };
 }
 
 // ── HWPX 텍스트 추출 ─────────────────────────────────────────
@@ -227,32 +233,32 @@ export async function processFile(file) {
 
     switch (type) {
         case 'pdf': {
-            const text = await extractTextFromPDF(file);
-            if (!text || text.trim().length === 0) {
+            const result = await extractTextFromPDF(file);
+            if (!result.text || result.text.trim().length === 0) {
                 throw new Error('PDF에서 텍스트를 추출하지 못했습니다. 이미지 기반 PDF일 수 있습니다.');
             }
-            return text;
+            return result;
         }
         case 'excel': {
             const text = await extractTextFromExcel(file);
             if (!text || text.trim().length === 0) {
                 throw new Error('엑셀 파일에서 데이터를 추출하지 못했습니다. 파일이 비어있을 수 있습니다.');
             }
-            return text;
+            return { text, pages: 1 };
         }
         case 'pptx': {
-            const text = await extractTextFromPPTX(file);
-            if (!text || text.trim().length === 0) {
+            const result = await extractTextFromPPTX(file);
+            if (!result.text || result.text.trim().length === 0) {
                 throw new Error('PPTX 파일에서 텍스트를 추출하지 못했습니다.');
             }
-            return text;
+            return result;
         }
         case 'hwpx': {
             const text = await extractTextFromHWPX(file);
             if (!text || text.trim().length === 0) {
                 throw new Error('HWPX 파일에서 텍스트를 추출하지 못했습니다.');
             }
-            return text;
+            return { text, pages: 1 };
         }
         case 'unsupported':
             throw new Error(
@@ -262,7 +268,7 @@ export async function processFile(file) {
         default: {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
-                reader.onload = (ev) => resolve(ev.target.result);
+                reader.onload = (ev) => resolve({ text: ev.target.result, pages: 1 });
                 reader.onerror = () => reject(new Error('파일 읽기에 실패했습니다.'));
                 reader.readAsText(file, 'UTF-8');
             });

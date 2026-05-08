@@ -456,3 +456,128 @@ ${ragContext ? `\n${ragContext}` : ''}
         throw new Error(`Gemini 검증 실패: ${e.message}`);
     }
 }
+
+export async function askRagQuestion(docTitle, docContent, question, apiKey, onProgress) {
+    const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.match(/^(AIza|AQ\.)/));
+    if (keys.length === 0) throw new Error("유효한 Gemini API Key가 없습니다.");
+
+    // 사용량 기록 유틸리티 연동
+    const recordUsage = (modelName) => {
+        try {
+            const usage = JSON.parse(localStorage.getItem('gemini_model_usage') || '{}');
+            usage[modelName] = (usage[modelName] || 0) + 1;
+            localStorage.setItem('gemini_model_usage', JSON.stringify(usage));
+            window.dispatchEvent(new CustomEvent('gemini_usage_updated'));
+        } catch (e) {
+            console.error("Usage recording failed:", e);
+        }
+    };
+
+    const systemPrompt = `당신은 ISMP 산출물 전문 Q&A 어시스턴트입니다. 
+제공된 문서 [${docTitle}]의 내용을 바탕으로 사용자의 질문에 전문적이고 친절하게 답변하십시오. 
+문서에 명시되지 않은 내용에 대해서는 추측하지 말고 문서에서 해당 내용을 찾을 수 없다고 답변하십시오. 
+가능한 경우 답변 시 문서의 구절을 인용하거나 요약하여 근거를 제시하십시오.`;
+
+    const userInput = `
+[시스템 지시사항]
+${systemPrompt}
+
+[문서 제목]: ${docTitle}
+[문서 내용]:
+${(docContent || '').substring(0, 800000)}
+
+[사용자 질문]: ${question}
+`;
+
+    // 메인 엔진과 동일한 모델 목록
+    const FALLBACK_MODELS = [
+        "models/gemini-3-flash",
+        "models/gemini-2.5-pro",
+        "models/gemini-2.5-flash",
+        "models/gemini-2.5-flash-lite",
+        "models/gemini-1.5-flash",
+        "models/gemini-1.5-pro",
+        "models/gemini-1.5-flash-8b",
+        "models/gemini-2.0-flash-exp"
+    ];
+
+    let currentKeyIndex = 0;
+    let currentModelIndex = 0;
+
+    const fetchWithRetry = async (maxModelRetries = FALLBACK_MODELS.length) => {
+        let modelRetries = 0;
+        
+        while (modelRetries < maxModelRetries) {
+            const activeKey = keys[currentKeyIndex];
+            const modelId = FALLBACK_MODELS[currentModelIndex];
+            const fetchUrl = `https://generativelanguage.googleapis.com/v1beta/${modelId}:generateContent?key=${activeKey}`;
+            
+            if (onProgress) {
+                const keyInfo = keys.length > 1 ? ` (키 ${currentKeyIndex + 1}/${keys.length} 사용 중)` : '';
+                onProgress(`${modelId.split('/').pop()} 모델로 답변 생성 중...${keyInfo}`);
+            }
+
+            try {
+                const response = await fetch(fetchUrl, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{ role: "user", parts: [{ text: userInput }] }],
+                        generationConfig: { temperature: 0.2, maxOutputTokens: 2048 }
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const candidate = data.candidates?.[0];
+                    if (candidate?.finishReason === 'SAFETY') return "안전 정책상 답변을 생성할 수 없습니다.";
+                    const answer = candidate?.content?.parts?.[0]?.text;
+                    if (answer) {
+                        recordUsage(modelId); // 사용량 기록
+                        return answer;
+                    }
+                    throw new Error("AI가 빈 답변을 반환했습니다.");
+                }
+
+                const errData = await response.json().catch(() => ({}));
+                const errMsg = errData.error?.message || response.statusText || "";
+                const isModelUnavailable = response.status === 404
+                    || response.status === 400
+                    || errMsg.toLowerCase().includes('not found')
+                    || errMsg.toLowerCase().includes('not supported')
+                    || errMsg.toLowerCase().includes('deprecated');
+
+                // 1. 에러 발생 시 항상 다음 API 키를 먼저 시도
+                if (keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
+                    currentKeyIndex++;
+                    if (onProgress) onProgress(`API 오류로 다음 키로 교체 시도 중 (${currentKeyIndex + 1}/${keys.length})`);
+                    continue;
+                }
+
+                // 2. 모든 키를 다 썼다면 모델 교체 시도
+                if (response.status === 429 || response.status >= 500 || isModelUnavailable) {
+                    modelRetries++;
+                    if (modelRetries < maxModelRetries) {
+                        currentKeyIndex = 0;
+                        currentModelIndex = (currentModelIndex + 1) % FALLBACK_MODELS.length;
+                        const reason = isModelUnavailable ? '모델 미지원' : (response.status === 429 ? '할당량 소진' : '서버 혼잡');
+                        if (onProgress) onProgress(`[${reason}] 다음 가용 모델로 전환하여 재시도합니다.`);
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        continue;
+                    }
+                    throw new Error("모든 API 키와 모델의 가용 한도가 소진되었습니다.");
+                }
+                
+                throw new Error(errMsg || response.statusText);
+            } catch (e) {
+                if (modelRetries >= maxModelRetries - 1) throw e;
+                modelRetries++;
+                currentKeyIndex = 0;
+                currentModelIndex = (currentModelIndex + 1) % FALLBACK_MODELS.length;
+                await new Promise(r => setTimeout(r, 1000));
+            }
+        }
+    };
+
+    return await fetchWithRetry();
+}

@@ -422,7 +422,7 @@ function App() {
           { activeTab === 'ppt' && <PptGenerator apiKey={apiKey} /> }
           {activeTab === 'meeting' && <MeetingMinutes apiKey={apiKey} />}
           {activeTab === 'library' && <ReferenceLibrary />}
-          {activeTab === 'rag' && <RagKnowledgeBase />}
+          {activeTab === 'rag' && <RagKnowledgeBase apiKey={apiKey} />}
         </div>
       </main>
 
