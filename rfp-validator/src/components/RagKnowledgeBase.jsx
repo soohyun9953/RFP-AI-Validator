@@ -19,6 +19,12 @@ const RagKnowledgeBase = ({ apiKey }) => {
         const file = e.target.files[0];
         if (!file) return;
 
+        // 운영 환경(Vercel 등) 체크
+        if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+            alert("문서 등록/삭제 기능은 로컬 개발 환경에서만 지원됩니다. 로컬에서 데이터를 관리한 후 GitHub에 푸시하여 배포해 주세요.");
+            return;
+        }
+
         setIsUploading(true);
         try {
             // 1. 파일 텍스트 추출
@@ -64,6 +70,12 @@ const RagKnowledgeBase = ({ apiKey }) => {
 
     const handleDeleteDoc = async (docId, docTitle) => {
         if (!window.confirm(`[${docTitle}] 문서를 지식베이스에서 삭제하시겠습니까?`)) return;
+
+        // 운영 환경(Vercel 등) 체크
+        if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+            alert("운영 환경(Vercel)에서는 직접적인 파일 삭제가 제한됩니다. 로컬 환경에서 삭제 후 배포해 주세요.");
+            return;
+        }
 
         try {
             const response = await fetch('/api/delete-rag', {
@@ -135,6 +147,12 @@ const RagKnowledgeBase = ({ apiKey }) => {
     const handleReindex = async () => {
         if (!window.confirm('로컬 산출물 폴더를 다시 스캔하여 지식베이스를 갱신하시겠습니까?\n(약 수초~수십초가 소요될 수 있습니다)')) return;
         
+        // 운영 환경(Vercel 등) 체크
+        if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+            alert("지식베이스 갱신은 로컬 환경에서만 가능합니다.");
+            return;
+        }
+
         setIsReindexing(true);
         try {
             const response = await fetch('/api/reindex', { method: 'POST' });
