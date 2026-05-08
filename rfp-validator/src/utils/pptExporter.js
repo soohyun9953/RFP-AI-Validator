@@ -213,7 +213,14 @@ export async function generatePptFromTemplate(pptTemplateFile, dataRows, generat
             const flatData = {};
             dataRows.forEach((rowObj, idx) => {
                 const rowNum = idx + 1;
-                for (const key in rowObj) flatData[`${key}_${rowNum}`] = rowObj[key];
+                for (const key in rowObj) {
+                    let val = rowObj[key];
+                    if (typeof val === 'string') {
+                        // 엑셀에서 넘어온 \r\n을 \n으로 정규화하여 PPT 내 이중 공백 방지
+                        val = val.replace(/\r\n/g, '\n');
+                    }
+                    flatData[`${key}_${rowNum}`] = val;
+                }
             });
 
             doc.render(flatData);
@@ -571,7 +578,6 @@ export async function injectSlidesIntoMaster(masterFile, aiGenBlob) {
         let relsStr = zipAi.file(relsPath)?.asText();
         
         if (!slideStr || !relsStr) continue;
-
         // 레이아웃 참조를 마스터의 레이아웃으로 변경
         relsStr = relsStr.replace(/Target="([^"]*slideLayout[^"]*)"/, `Target="${masterLayoutTarget}"`);
         
@@ -616,15 +622,21 @@ export async function injectSlidesIntoMaster(masterFile, aiGenBlob) {
 /**
  * [신규] PPT 파일에 단어 일괄 수정과 텍스트 디자인 일괄 변경을 동시에 적용하여 Blob을 반환합니다.
  * @param {File} pptFile 처리할 PPT 파일
- * @param {Object} options { replaceRules: Array, applyDesign: boolean, targetText: string }
+ * @param {Object} options { replaceRules: Array, fontRules: Array, applyDesign: boolean, targetText: string }
  * @returns {Promise<Blob>} 변환된 PPT 파일 Blob
  */
 export async function processPptBatch(pptFile, options) {
     if (!pptFile) throw new Error('PPT 파일이 필요합니다.');
     
-    const { replaceRules = [], applyDesign = false, targetText = '' } = options;
+    const { 
+        replaceRules = [], 
+        fontRules = [], 
+        fontSizeRules = [],
+        applyDesign = false, 
+        targetText = '' 
+    } = options;
     
-    if (replaceRules.length === 0 && !applyDesign) {
+    if (replaceRules.length === 0 && fontRules.length === 0 && !applyDesign && fontSizeRules.length === 0) {
         throw new Error('적용할 변경 사항이 없습니다.');
     }
 
@@ -640,7 +652,7 @@ export async function processPptBatch(pptFile, options) {
     
     // 타겟 슬라이드 XML 파일 목록
     const targetFiles = allFiles.filter(p => p.endsWith('.xml') && 
-        (p.startsWith('ppt/slides/slide') || p.startsWith('ppt/slideLayouts/') || p.startsWith('ppt/slideMasters/'))
+        (p.startsWith('ppt/slides/slide') || p.startsWith('ppt/slideLayouts/') || p.startsWith('ppt/slideMasters/') || p.startsWith('ppt/theme/'))
     );
 
     // 텍스트 디자인 대상 탐색 로직 (적용 시에만)
@@ -651,6 +663,8 @@ export async function processPptBatch(pptFile, options) {
     if (applyDesign) {
         if (trimmedTargetText !== '') {
             targetFiles.forEach(slidePath => {
+                if (slidePath.startsWith('ppt/theme/')) return; // 테마는 디자인 변경 대상에서 제외
+                
                 let slideText = '';
                 const filesInSlide = [slidePath];
 
@@ -687,14 +701,14 @@ export async function processPptBatch(pptFile, options) {
                     } catch (e) {}
                 });
 
-                // 단어가 교체된 후에도 적용될 수 있도록, 여기서는 현재 상태(또는 교체 전 상태) 기반으로 찾습니다.
-                // 완벽히 하려면 교체 후 텍스트로 검사해야 하지만, 보통 대상 텍스트는 라벨링 목적이므로 문제없음.
                 if (slideText.replace(/\s+/g, '').includes(rawTarget)) {
                     filesInSlide.forEach(fp => designTargetFilesSet.add(fp));
                 }
             });
         } else {
-            targetFiles.forEach(path => designTargetFilesSet.add(path));
+            targetFiles.forEach(path => {
+                if (!path.startsWith('ppt/theme/')) designTargetFilesSet.add(path);
+            });
         }
     }
 
@@ -702,51 +716,130 @@ export async function processPptBatch(pptFile, options) {
         let slideXmlStr = zip.file(slidePath).asText();
         let fileChanged = false;
         
-        // 1. 단어 일괄 수정
-        if (replaceRules.length > 0) {
-            let containsAny = false;
-            for (const rule of replaceRules) {
-                if (slideXmlStr.includes(rule.oldWord)) {
-                    containsAny = true;
-                    break;
+        const xmlDoc = parser.parseFromString(slideXmlStr, 'application/xml');
+        if (xmlDoc.getElementsByTagName('parsererror').length > 0) return;
+        
+        const allElements = xmlDoc.getElementsByTagName('*');
+        
+        // 1. 단어 일괄 수정 \u0026 3. 폰트 일괄 교체 \u0026 4. 폰트 크기 변경 통합 루프
+        for (let i = 0; i < allElements.length; i++) {
+            const el = allElements[i];
+            if (el.nodeType !== 1) continue;
+            
+            const localName = el.localName || el.tagName.split(':').pop();
+            
+            // 단어 수정 (t 태그)
+            if (localName === 't' && replaceRules.length > 0) {
+                let text = el.textContent;
+                let originalText = text;
+                for (const rule of replaceRules) {
+                    text = text.split(rule.oldWord).join(rule.newWord);
+                }
+                if (text !== originalText) {
+                    el.textContent = text;
+                    fileChanged = true;
+                    hasChanges = true;
                 }
             }
             
-            if (containsAny) {
-                const xmlDoc = parser.parseFromString(slideXmlStr, 'application/xml');
-                if (xmlDoc.getElementsByTagName('parsererror').length === 0) {
-                    const allElements = xmlDoc.getElementsByTagName('*');
-                    for (let i = 0; i < allElements.length; i++) {
-                        const el = allElements[i];
-                        if (el.nodeType !== 1) continue;
-                        
-                        const localName = el.localName || el.tagName.split(':').pop();
-                        if (localName === 't') {
-                            let text = el.textContent;
-                            let originalText = text;
-                            
-                            for (const rule of replaceRules) {
-                                text = text.split(rule.oldWord).join(rule.newWord);
+            // 폰트 교체 (latin, ea, cs 태그)
+            if (fontRules.length > 0 && (localName === 'latin' || localName === 'ea' || localName === 'cs')) {
+                const typeface = el.getAttribute('typeface');
+                if (typeface) {
+                    for (const rule of fontRules) {
+                        if (typeface === rule.oldWord) {
+                            el.setAttribute('typeface', rule.newWord);
+                            fileChanged = true;
+                            hasChanges = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // 폰트 크기 변경 (전체 일괄 적용 및 매핑 적용)
+            if (fontSizeRules.length > 0 && !slidePath.startsWith('ppt/theme/')) {
+                // 1. 텍스트 런 및 필드 수준 처리 (r, fld, br)
+                if (localName === 'r' || localName === 'fld' || localName === 'br') {
+                    let rPr = null;
+                    for (let j = 0; j < el.childNodes.length; j++) {
+                        const child = el.childNodes[j];
+                        if (child.nodeType === 1 && (child.localName === 'rPr' || child.tagName.split(':').pop() === 'rPr')) {
+                            rPr = child;
+                            break;
+                        }
+                    }
+                    
+                    if (rPr) {
+                        const currentSz = parseInt(rPr.getAttribute('sz'));
+                        for (const rule of fontSizeRules) {
+                            if (rule.oldSize === null) {
+                                // 전체 적용 모드
+                                const newSzVal = Math.round(rule.newSize * 100).toString();
+                                if (rPr.getAttribute('sz') !== newSzVal) {
+                                    rPr.setAttribute('sz', newSzVal);
+                                    fileChanged = true;
+                                    hasChanges = true;
+                                }
+                                break;
+                            } else {
+                                // 매핑 모드
+                                const oldSzVal = Math.round(rule.oldSize * 100);
+                                if (currentSz === oldSzVal) {
+                                    const newSzVal = Math.round(rule.newSize * 100).toString();
+                                    rPr.setAttribute('sz', newSzVal);
+                                    fileChanged = true;
+                                    hasChanges = true;
+                                    break;
+                                }
                             }
-                            
-                            if (text !== originalText) {
-                                el.textContent = text;
+                        }
+                    } else {
+                        // rPr이 없는 경우, oldSize가 null인 규칙이 있다면 생성하여 적용
+                        for (const rule of fontSizeRules) {
+                            if (rule.oldSize === null) {
+                                rPr = xmlDoc.createElementNS(nsA, 'a:rPr');
+                                rPr.setAttribute('sz', Math.round(rule.newSize * 100).toString());
+                                el.insertBefore(rPr, el.firstChild);
                                 fileChanged = true;
                                 hasChanges = true;
+                                break;
                             }
                         }
                     }
-                    if (fileChanged) {
-                        slideXmlStr = serializer.serializeToString(xmlDoc);
+                }
+                
+                // 2. 단락 기본 및 종료 스타일 처리 (defRPr, endParaRPr)
+                if (localName === 'defRPr' || localName === 'endParaRPr') {
+                    const currentSz = parseInt(el.getAttribute('sz'));
+                    for (const rule of fontSizeRules) {
+                        if (rule.oldSize === null) {
+                            const newSzVal = Math.round(rule.newSize * 100).toString();
+                            if (el.getAttribute('sz') !== newSzVal) {
+                                el.setAttribute('sz', newSzVal);
+                                fileChanged = true;
+                                hasChanges = true;
+                            }
+                            break;
+                        } else {
+                            const oldSzVal = Math.round(rule.oldSize * 100);
+                            if (currentSz === oldSzVal) {
+                                const newSzVal = Math.round(rule.newSize * 100).toString();
+                                el.setAttribute('sz', newSzVal);
+                                fileChanged = true;
+                                hasChanges = true;
+                                break;
+                            }
+                        }
                     }
                 }
             }
         }
-        
+
         // 2. 텍스트 디자인 일괄 변경
         if (applyDesign && designTargetFilesSet.has(slidePath)) {
-            const xmlDoc = parser.parseFromString(slideXmlStr, 'application/xml');
-            if (xmlDoc.getElementsByTagName('parsererror').length === 0) {
+            const xmlDocInner = parser.parseFromString(slideXmlStr, 'application/xml'); // 새로 파싱하거나 기존 것 사용
+            if (xmlDocInner.getElementsByTagName('parsererror').length === 0) {
                 function applyLnToRPr(rPr) {
                     let existingLn = null;
                     for (let j = 0; j < rPr.childNodes.length; j++) {
@@ -758,22 +851,22 @@ export async function processPptBatch(pptFile, options) {
                     }
                     if (existingLn) rPr.removeChild(existingLn);
 
-                    const ln = xmlDoc.createElementNS(nsA, 'a:ln');
+                    const ln = xmlDocInner.createElementNS(nsA, 'a:ln');
                     ln.setAttribute('w', '9525');
                     ln.setAttribute('cmpd', 'sng');
 
-                    const solidFill = xmlDoc.createElementNS(nsA, 'a:solidFill');
-                    const srgbClr = xmlDoc.createElementNS(nsA, 'a:srgbClr');
+                    const solidFill = xmlDocInner.createElementNS(nsA, 'a:solidFill');
+                    const srgbClr = xmlDocInner.createElementNS(nsA, 'a:srgbClr');
                     srgbClr.setAttribute('val', 'FFFFFF');
 
-                    const alpha = xmlDoc.createElementNS(nsA, 'a:alpha');
+                    const alpha = xmlDocInner.createElementNS(nsA, 'a:alpha');
                     alpha.setAttribute('val', '0');
 
                     srgbClr.appendChild(alpha);
                     solidFill.appendChild(srgbClr);
                     ln.appendChild(solidFill);
                     
-                    const prstDash = xmlDoc.createElementNS(nsA, 'a:prstDash');
+                    const prstDash = xmlDocInner.createElementNS(nsA, 'a:prstDash');
                     prstDash.setAttribute('val', 'solid');
                     ln.appendChild(prstDash);
                     
@@ -781,9 +874,9 @@ export async function processPptBatch(pptFile, options) {
                 }
 
                 let designChanged = false;
-                const allElements = xmlDoc.getElementsByTagName('*');
-                for (let i = 0; i < allElements.length; i++) {
-                    const el = allElements[i];
+                const allElementsInner = xmlDocInner.getElementsByTagName('*');
+                for (let i = 0; i < allElementsInner.length; i++) {
+                    const el = allElementsInner[i];
                     if (el.nodeType !== 1) continue;
                     const localName = el.localName || el.tagName.split(':').pop();
                     
@@ -797,7 +890,7 @@ export async function processPptBatch(pptFile, options) {
                             }
                         }
                         if (!rPr) {
-                            rPr = xmlDoc.createElementNS(nsA, 'a:rPr');
+                            rPr = xmlDocInner.createElementNS(nsA, 'a:rPr');
                             el.insertBefore(rPr, el.firstChild);
                         }
                         applyLnToRPr(rPr);
@@ -811,7 +904,7 @@ export async function processPptBatch(pptFile, options) {
                 }
                 
                 if (designChanged) {
-                    slideXmlStr = serializer.serializeToString(xmlDoc);
+                    slideXmlStr = serializer.serializeToString(xmlDocInner);
                     fileChanged = true;
                 }
             }

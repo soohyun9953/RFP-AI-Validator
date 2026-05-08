@@ -98,7 +98,7 @@ function mergeResults(res1, res2, isTypoMode) {
     return merged;
 }
 
-export async function analyzeDocumentsWithLLM(guidelineText, artifactText, inspectionScope, apiKey, glossaryText, onProgress, selectedModel = 'auto', isSubCall = false) {
+export async function analyzeDocumentsWithLLM(guidelineText, artifactText, inspectionScope, apiKey, glossaryText, onProgress, selectedModel = 'auto', isSubCall = false, ragContext = "") {
     const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.match(/^(AIza|AQ\.)/));
     if (keys.length === 0) {
         throw new Error("유효한 API 키가 제공되지 않았습니다.");
@@ -112,10 +112,10 @@ export async function analyzeDocumentsWithLLM(guidelineText, artifactText, inspe
             if (onProgress) onProgress("산출물 용량이 커서 2회로 나누어 분석을 진행합니다. (1/2부 시작)");
             const [part1, part2] = splitTextAtNewline(artifactText);
             
-            const res1 = await analyzeDocumentsWithLLM(guidelineText, part1, inspectionScope, apiKey, glossaryText, onProgress, selectedModel, true);
+            const res1 = await analyzeDocumentsWithLLM(guidelineText, part1, inspectionScope, apiKey, glossaryText, onProgress, selectedModel, true, ragContext);
             
             if (onProgress) onProgress("1부 분석 완료. 2부 분석을 진행합니다. (2/2부 시작)");
-            const res2 = await analyzeDocumentsWithLLM(guidelineText, part2, inspectionScope, apiKey, glossaryText, onProgress, selectedModel, true);
+            const res2 = await analyzeDocumentsWithLLM(guidelineText, part2, inspectionScope, apiKey, glossaryText, onProgress, selectedModel, true, ragContext);
             
             if (onProgress) onProgress("분석 결과 병합 중...");
             return mergeResults(res1, res2, true);
@@ -125,10 +125,10 @@ export async function analyzeDocumentsWithLLM(guidelineText, artifactText, inspe
             if (onProgress) onProgress("기준 문서 용량이 커서 2회로 나누어 분석을 진행합니다. (1/2부 시작)");
             const [part1, part2] = splitTextAtNewline(guidelineText);
             
-            const res1 = await analyzeDocumentsWithLLM(part1, artifactText, inspectionScope, apiKey, glossaryText, onProgress, selectedModel, true);
+            const res1 = await analyzeDocumentsWithLLM(part1, artifactText, inspectionScope, apiKey, glossaryText, onProgress, selectedModel, true, ragContext);
             
             if (onProgress) onProgress("1부 분석 완료. 2부 분석을 진행합니다. (2/2부 시작)");
-            const res2 = await analyzeDocumentsWithLLM(part2, artifactText, inspectionScope, apiKey, glossaryText, onProgress, selectedModel, true);
+            const res2 = await analyzeDocumentsWithLLM(part2, artifactText, inspectionScope, apiKey, glossaryText, onProgress, selectedModel, true, ragContext);
             
             if (onProgress) onProgress("분석 결과 병합 중...");
             return mergeResults(res1, res2, false);
@@ -260,6 +260,7 @@ ${(artifactText || '').substring(0, 2000000)}
 
 --- 점검 범위 (해당 내용이 있으면 위주로 더 엄격히 볼 것) ---
 ${inspectionScope || '없음'}
+${ragContext ? `\n${ragContext}` : ''}
 `;
 
     try {

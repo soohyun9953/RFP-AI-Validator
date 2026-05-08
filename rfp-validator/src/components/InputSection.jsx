@@ -226,6 +226,7 @@ export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = fals
     const [artifact, setArtifact] = useState('');
     const [inspectionScope, setInspectionScope] = useState('');
     const [glossary, setGlossary] = useState(() => localStorage.getItem('rfp_glossary') || '');
+    const [useRag, setUseRag] = useState(false);
     
     // 파일 정보 및 로딩 상태
     const [guidelineFile, setGuidelineFile] = useState('');
@@ -463,9 +464,24 @@ export default function InputSection({ onAnalyze, isAnalyzing, isTypoMode = fals
                 )}
             </div>
 
+            {/* RAG Option Checkbox */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: useRag ? 'rgba(59, 130, 246, 0.08)' : 'rgba(255,255,255,0.02)', borderRadius: '12px', border: `1px solid ${useRag ? 'rgba(59, 130, 246, 0.3)' : 'var(--glass-border)'}`, cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => setUseRag(!useRag)}>
+                <input 
+                    type="checkbox" 
+                    checked={useRag} 
+                    onChange={(e) => setUseRag(e.target.checked)} 
+                    style={{ cursor: 'pointer', width: '18px', height: '18px' }} 
+                    onClick={(e) => e.stopPropagation()}
+                />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '14px', fontWeight: 700, color: useRag ? 'var(--accent-blue)' : 'var(--text-primary)' }}>ISMP RAG 지식베이스 연동</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>데스크탑 산출물 데이터를 분석의 배경 지식으로 활용합니다.</span>
+                </div>
+            </div>
+
             <button
                 className="primary interactive"
-                onClick={() => onAnalyze(guideline, artifact, inspectionScope, glossary, artifactFile)}
+                onClick={() => onAnalyze(guideline, artifact, inspectionScope, glossary, artifactFile, useRag)}
                 disabled={isAnalyzing || guidelineLoading || artifactLoading || glossaryLoading || ((!isTypoMode && !guideline && !artifact && !glossary) || (isTypoMode && !artifact))}
                 style={{
                     marginTop: '12px',

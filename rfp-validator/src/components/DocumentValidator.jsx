@@ -3,6 +3,7 @@ import { ArrowRight, Loader2, RotateCcw, ShieldCheck } from 'lucide-react';
 import InputSection from './InputSection';
 import ResultDashboard from './ResultDashboard';
 import { analyzeDocumentsWithLLM } from '../llmAnalyzer';
+import { getRagContext } from '../utils/ragService';
 
 function DocumentValidator({ apiKey }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -11,8 +12,8 @@ function DocumentValidator({ apiKey }) {
   const [resultData, setResultData] = useState(null);
   const lastParams = useRef(null);
 
-  const handleAnalyze = useCallback(async (guideline, artifact, inspectionScope, glossary, artifactFileName) => {
-    lastParams.current = { guideline, artifact, inspectionScope, glossary, artifactFileName };
+  const handleAnalyze = useCallback(async (guideline, artifact, inspectionScope, glossary, artifactFileName, useRag = false) => {
+    lastParams.current = { guideline, artifact, inspectionScope, glossary, artifactFileName, useRag };
     setIsAnalyzing(true);
     setResultData(null);
     setRetryStatus(null);
@@ -26,10 +27,21 @@ function DocumentValidator({ apiKey }) {
 
     try {
       if (apiKey && apiKey.match(/^(AIza|AQ\.)/)) {
+        let ragContext = "";
+        if (useRag) {
+          if (setRetryStatus) setRetryStatus("RAG 지식베이스 검색 중...");
+          // Use a combination of inspectionScope and artifact snippet for search query
+          const searchQuery = `${inspectionScope} ${artifact.substring(0, 500)}`;
+          ragContext = await getRagContext(searchQuery);
+          if (setRetryStatus) setRetryStatus("RAG 검색 완료");
+        }
+
         const result = await analyzeDocumentsWithLLM(
           guideline, artifact, inspectionScope, apiKey, glossary,
           (status) => setRetryStatus(status),
-          'auto'
+          'auto',
+          false,
+          ragContext
         );
         setResultData({ ...result, artifactFileName });
       } else {
@@ -55,8 +67,8 @@ function DocumentValidator({ apiKey }) {
 
   const handleRetry = () => {
     if (lastParams.current) {
-        const { guideline, artifact, inspectionScope, glossary, artifactFileName } = lastParams.current;
-        handleAnalyze(guideline, artifact, inspectionScope, glossary, artifactFileName);
+        const { guideline, artifact, inspectionScope, glossary, artifactFileName, useRag } = lastParams.current;
+        handleAnalyze(guideline, artifact, inspectionScope, glossary, artifactFileName, useRag);
     }
   };
 

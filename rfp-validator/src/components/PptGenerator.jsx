@@ -22,6 +22,8 @@ export default function PptGenerator() {
     // PPT 일괄 편집 (단어 수정 + 디자인 변경) 관련 State
     const [batchPptFiles, setBatchPptFiles] = useState([]);
     const [replaceRules, setReplaceRules] = useState('');
+    const [fontRules, setFontRules] = useState('');
+    const [fontSize, setFontSize] = useState('');
     const [applyDesignChecked, setApplyDesignChecked] = useState(false);
     const [designTargetText, setDesignTargetText] = useState('');
     const [isProcessingBatch, setIsProcessingBatch] = useState(false);
@@ -171,8 +173,51 @@ export default function PptGenerator() {
             }
         }
 
-        if (parsedRules.length === 0 && !applyDesignChecked) {
-            setErrorMsg('적용할 단어 수정 규칙이나 텍스트 디자인 변경을 선택해주세요.');
+        let parsedFontRules = [];
+        if (fontRules.trim()) {
+            const parts = fontRules.split(',');
+            for (const part of parts) {
+                const trimmed = part.trim();
+                if (!trimmed) continue;
+                const match = trimmed.match(/^(.+?)\((.+?)\)$/);
+                if (match) {
+                    parsedFontRules.push({ oldWord: match[1].trim(), newWord: match[2].trim() });
+                } else {
+                    setErrorMsg(`폰트 규칙 형식이 올바르지 않습니다: "${trimmed}" (예: Arial(나눔고딕))`);
+                    return;
+                }
+            }
+        }
+
+        let parsedFontSizeRules = [];
+        if (fontSize.trim()) {
+            const parts = fontSize.split(',');
+            for (const part of parts) {
+                const trimmed = part.trim();
+                if (!trimmed) continue;
+                const match = trimmed.match(/^(.+?)\((.+?)\)$/);
+                if (match) {
+                    const oldSize = parseFloat(match[1].trim());
+                    const newSize = parseFloat(match[2].trim());
+                    if (isNaN(oldSize) || isNaN(newSize)) {
+                        setErrorMsg(`폰트 크기 규칙의 숫자가 올바르지 않습니다: "${trimmed}"`);
+                        return;
+                    }
+                    parsedFontSizeRules.push({ oldSize, newSize });
+                } else {
+                    // 단일 숫자 입력 시 전체 적용 (기존 기능 유지)
+                    const size = parseFloat(trimmed);
+                    if (isNaN(size)) {
+                        setErrorMsg(`폰트 크기 형식이 올바르지 않습니다: "${trimmed}" (예: 7.9(10.0))`);
+                        return;
+                    }
+                    parsedFontSizeRules.push({ oldSize: null, newSize: size });
+                }
+            }
+        }
+
+        if (parsedRules.length === 0 && parsedFontRules.length === 0 && !applyDesignChecked && parsedFontSizeRules.length === 0) {
+            setErrorMsg('적용할 단어 수정, 폰트 변경, 폰트 크기, 또는 텍스트 디자인 변경 중 하나 이상을 입력/선택해주세요.');
             return;
         }
 
@@ -204,11 +249,14 @@ export default function PptGenerator() {
 
             for (const file of batchPptFiles) {
                 try {
-                    const modifiedBlob = await processPptBatch(file, {
-                        replaceRules: parsedRules,
-                        applyDesign: applyDesignChecked,
-                        targetText: designTargetText
-                    });
+                    const options = { 
+                        replaceRules: parsedRules, 
+                        fontRules: parsedFontRules,
+                        fontSizeRules: parsedFontSizeRules,
+                        applyDesign: applyDesignChecked, 
+                        targetText: designTargetText 
+                    };
+                    const modifiedBlob = await processPptBatch(file, options);
 
                     const fileName = `수정_${file.name}`;
                     
@@ -565,7 +613,49 @@ export default function PptGenerator() {
                                 </div>
                             </div>
 
-                            {/* 옵션 2: 텍스트 디자인 */}
+                            {/* 옵션 B: 폰트 교체 */}
+                            <div style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                                <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '8px', color: 'var(--text-primary)' }}>
+                                    옵션 B: 일괄 변경할 폰트 입력 (선택)
+                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="예: Arial(나눔고딕), Calibri(Pretendard)"
+                                    value={fontRules}
+                                    onChange={(e) => setFontRules(e.target.value)}
+                                    style={{
+                                        width: '100%', padding: '12px 16px', borderRadius: '8px',
+                                        background: 'rgba(0,0,0,0.2)', border: '1px solid var(--panel-border)',
+                                        color: 'var(--text-primary)', fontSize: '14px', marginBottom: '8px'
+                                    }}
+                                />
+                                <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                                    형식: <code>기존폰트(변경폰트)</code> (복수는 쉼표로 구분)
+                                </div>
+                            </div>
+
+                            {/* 옵션 C: 폰트 크기 변경 */}
+                            <div style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                                <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '8px', color: 'var(--text-primary)' }}>
+                                    옵션 C: 변경할 폰트 크기 입력 (선택)
+                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="예: 7.9(10.0), 12(14)"
+                                    value={fontSize}
+                                    onChange={(e) => setFontSize(e.target.value)}
+                                    style={{
+                                        width: '100%', padding: '12px 16px', borderRadius: '8px',
+                                        background: 'rgba(0,0,0,0.2)', border: '1px solid var(--panel-border)',
+                                        color: 'var(--text-primary)', fontSize: '14px', marginBottom: '8px'
+                                    }}
+                                />
+                                <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                                    형식: <code>기존크기(변경크기)</code> (단일 숫자 입력 시 전체 적용)
+                                </div>
+                            </div>
+
+                            {/* 옵션 D: 텍스트 디자인 */}
                             <div style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: '8px', border: '1px solid var(--panel-border)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>
                                     <input 
@@ -574,7 +664,7 @@ export default function PptGenerator() {
                                         onChange={(e) => setApplyDesignChecked(e.target.checked)}
                                         style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#a855f7' }}
                                     />
-                                    옵션 B: 텍스트 윤곽선 디자인 일괄 변경 적용(흰색 실선, 투명도 100%, 너비 0.75)
+                                    옵션 D: 텍스트 윤곽선 디자인 일괄 변경 적용(흰색 실선, 투명도 100%, 너비 0.75)
                                 </label>
                                 
                                 {applyDesignChecked && (
