@@ -249,7 +249,7 @@ const RagKnowledgeBase = ({ apiKey }) => {
                         <Database size={28} color="var(--accent-blue)" />
                     </div>
                     <div>
-                        <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>RAG 지식베이스</h2>
+                        <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>프로젝트 RAG 지식베이스</h2>
                         <p style={{ margin: '4px 0 0', fontSize: '14px', color: 'var(--text-secondary)' }}>데스크탑 산출물 폴더 기반 인덱싱 데이터 ({stats.count}개 파일, {stats.size}MB)</p>
                     </div>
                 </div>
@@ -579,7 +579,7 @@ const RagKnowledgeBase = ({ apiKey }) => {
             <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(59, 130, 246, 0.05)', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.1)', display: 'flex', gap: '12px', alignItems: 'center' }}>
                 <Info size={20} color="var(--accent-blue)" />
                 <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                    RAG 지식베이스는 등록된 문서를 기반으로 AI 분석을 수행합니다. 새로운 문서를 추가하려면 <b>'문서 직접 등록'</b>을 이용하거나, 로컬 폴더의 파일 변경 시 <b>'지식베이스 갱신'</b> 버튼을 클릭하여 인덱스를 업데이트해 주세요.
+                    프로젝트 RAG 지식베이스는 등록된 문서를 기반으로 AI 분석을 수행합니다. 새로운 문서를 추가하려면 <b>'문서 직접 등록'</b>을 이용하거나, 로컬 폴더의 파일 변경 시 <b>'지식베이스 갱신'</b> 버튼을 클릭하여 인덱스를 업데이트해 주세요.
                 </div>
             </div>
         </div>

@@ -146,7 +146,7 @@ function App() {
     { id: 'meeting', label: 'AI 회의록 생성', icon: Mic2, color: '#8b5cf6' },
     { id: 'library', label: '참고자료 라이브러리', icon: Activity, color: '#64748b' },
     { id: 'aippt', label: '(작업중)AI PPT 디자이너', icon: Presentation, color: '#ec4899' },
-    { id: 'rag', label: 'ISMP RAG 지식베이스', icon: Database, color: 'var(--accent-blue)' },
+    { id: 'rag', label: '프로젝트 RAG 지식베이스', icon: Database, color: 'var(--accent-blue)' },
   ];
 
   const activeTabData = tabs.find(t => t.id === activeTab);
