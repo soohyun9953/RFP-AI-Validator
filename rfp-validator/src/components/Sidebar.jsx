@@ -6,7 +6,7 @@ function Sidebar({ activeMenu, setActiveMenu }) {
     { id: 'validator', label: 'AI 산출물 검증', icon: <FileText size={20} /> },
     { id: 'typo', label: 'AI 문서 품질/오탈자 점검', icon: <PenTool size={20} /> },
     { id: 'law_general', label: 'AI 법률 자문 (Gemini)', icon: <Scale size={20} /> },
-    { id: 'law', label: 'AI 법률 자문 (MCP)', icon: <Fingerprint size={20} /> },
+    { id: 'law', label: 'AI 법률 자문 (로컬 RAG)', icon: <Fingerprint size={20} /> },
     { id: 'erd', label: 'ERD 자동 설계', icon: <Database size={20} /> },
     { id: 'ppt', label: 'PPT 자동 생성', icon: <Presentation size={20} /> },
     { id: 'reference', label: '참고 자료 관리', icon: <Library size={20} /> },

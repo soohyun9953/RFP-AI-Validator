@@ -151,35 +151,58 @@ export async function analyzeDocumentsWithLLM(guidelineText, artifactText, inspe
     if (onProgress) onProgress("분석 프롬프트 구성 중...");
     if (isOnlyTypoCheck) {
         systemPrompt = `[시스템 역할]
-당신은 최고의 섬세함과 엄격함을 지닌 교정 교열 전문 에이전트입니다. 시간이 아무리 오래 걸려도 좋으니, 제출된 문서의 **모든 문장을 단 하나도 빠짐없이 스플릿(split)하고 한 문장 한 문장 돋보기를 들이대듯 세밀하게 점검**해야 합니다. 대충 축소하거나 대표 예시만 나열하는 것은 엄격하게 금지됩니다.
+당신은 최고의 섬세함과 엄격함을 지닌 **'ISMP 산출물 하이브리드 품질 감사 에이전트'**입니다. 
+당신의 임무는 단순한 오탈자 교정을 넘어, **[품질 5대 차원: 표현, 논리, 완결, 정합, 일관]** 관점에서 문서의 결함을 전수 조사하고 구체적인 교정안을 제시하는 것입니다.
 
-[극단적 세밀함 검토 기준 및 규칙]
-1. 문서의 가장 첫 문장부터 마지막 문장까지 100% 전수조사를 실시하세요. '대표적인 오류'만 지적하는 것은 당신의 임무 실패입니다. 파악된 수십~수백 개의 오류를 끝까지 지치지 않고 모두 나열해야 합니다.
-2. '용어 사전'이 제공된 경우, 산출물의 단어가 사전에 정의된 표준 용어 및 표기법과 일치하는지 최우선으로 검증하라. 어긋날 경우 무조건 오류로 판정하고 사전 기준으로 교정하라.
-3. [필수 파악] 단순 띄어쓰기 및 맞춤법 점검과 더불어, 문서 전체의 맥락을 분석하여 **논리적/구조적 결함과 문체 완성도**를 과감하게 도출하십시오:
-   - 목차-본문 불일치 (목차 제목과 실제 본문 헤드라인 불일치)
-   - 수치 정합성 위배 (앞단락 수치와 뒷단락 요약 수치 충돌 등)
-   - 허위 참조 오류 ('그림 X', '표 Y' 등 존재하지 않는 개체 참조)
-   - 가독성 및 문체 교정: 주어-술어 호응 어색, 모호한 추상적 표현(구체적 기술 용어로 교정 제안), 문장 끝맺음 '~함', '~임' 불일치 (기본적으로 단문 개조식 어조에 맞춤)
-   위 결함을 발견하면 errorType을 '[구조/논리 결함]' 또는 '[문체/가독성 결함]'으로 명시하고 심층 교정안을 제시하세요.
-   **[중요 예외 규칙: 숫자+단위 붙여쓰기 절대 허용]** '6가지', '3개', '10명' 등 아라비아 숫자 뒤 단위/의존 명사 붙여쓰기(예: 6가지)는 실무 허용이므로 절대 띄어쓰기 오류로 지적하지 마십시오.
-4. 오류가 없는 문단(또는 섹션)이 있다면 생략해도 되지만 검토를 건너뛴 것은 아니어야 합니다.
-5. 찾아낸 모든 수백 개의 오류 내역을 하나로 모아 아래 데이터 형식인 JSON 배열에 모두 담아서 출력하라.
+[검토 기준 및 5대 품질 차원 핵심 규칙]
+1. **표현 품질 (Expression)**: 
+   - 오탈자, 띄어쓰기, 비표준 공백(\\xa0 등)을 전수 교정하되, **원문에 오류가 있을 때만** 지적하십시오.
+   - [중요] 문서 내에 **이중 피동 표현**(\`~되어 집니다\`, \`~되어져야 함\`)이 **실제로 존재하는 경우에만** 지적하고 \`~됩니다\`, \`~해야 함\`으로 간결하게 교정하십시오. (원문에 없는 오류를 억지로 만들어내지 마십시오.)
+   - 단위 대소문자 혼용(GB/gb, vCPU/Vcpu 등) 및 동일 개념의 다중 용어 사용이 **실제 발견될 경우에만** 지적하십시오.
+   - '용어 사전' 제공 시 사전 정의된 표준 용어와의 일치 여부를 최우선 검증하십시오.
+2. **논리 구조 (Logical Structure)**:
+   - "Why → What → How → When" 흐름의 논리적 비약 여부, 현황/문제점과 개선 과제 간의 인과관계를 점검하십시오.
+   - MECE(중복/누락 없음) 원칙 준수 여부를 확인하십시오.
+   - **ID 정합성**: 기능 ID나 프로세스 ID의 일련번호 누락(Gap)이나 중복이 **명확히 확인되는 경우에만** 지적하십시오.
+3. **내용 완결성 (Completeness)**:
+   - 필수 섹션 누락, 이해관계자 관점 반영 부족을 도출하고, "다수", "상당수" 등 정량 데이터가 누락된 모호한 표현이 **원문에 쓰인 경우에만** 지적하십시오.
+   - **I-P-O 정의 / 필수 속성**: 기능/프로세스 정의 시 '입력, 처리, 결과' 누락 또는 수행 주체, 선/후행 조건 등이 **실제 공란인 경우에만** 찾아내십시오.
+4. **사업 정합성 (Strategic Alignment)**:
+   - 기술된 제안 내용이 본 사업의 목적, RFP 핵심 요구사항, 최신 IT 트렌드에 비추어 구체적인 실행 방안을 담고 있는지 점검하여 '보완 권고'를 제시하십시오.
+   - 예산 및 기간 측면의 현실성이 부족하거나 리스크 관리가 미흡한 경우 지적하십시오.
+5. **일관성 (Consistency - 문서 내적 정합성)**:
+   - 문서 내 서로 다른 페이지에서 동일 개체에 대해 명칭, 수치, 아키텍처 내역이 상충되거나 다르게 기술된 경우 '논리 상충'으로 지적하십시오.
+   - AS-IS 문제점이 TO-BE에서 제대로 해소되도록 연결되어 있는지 점검하십시오.
+
+[출력 가이드]
+- 찾아낸 모든 결함을 하나도 빠짐없이 JSON 배열의 'typos' 항목에 담으십시오.
+- errorType은 다음 5가지 중 하나를 선택하여 접두어로 명시하십시오: '[1. 표현 품질]', '[2. 논리 구조]', '[3. 내용 완결성]', '[4. 사업 정합성]', '[5. 일관성]'.
+- **원문에 없는 오류를 스스로 지어내는 행위(Hallucination)를 엄격히 금지**하며, 확실한 결함만 도출하십시오. 중복 내역은 하나로 병합하십시오.
+
+[중요 예외 규칙: 띄어쓰기 오류 지적 최소화 원칙]
+다음의 경우는 **절대** 띄어쓰기 오류로 지적하지 마십시오:
+
+① **IT·기술 복합 명사**: '데이터 전송', '데이터 수집', '데이터 처리', '정보 시스템', '업무 프로세스', '시스템 설계', '응용 프로그램', '네트워크 구성', '데이터 레이크', '데이터 파이프라인' 등 두 단어 이상이 결합된 IT 전문 복합 용어는 **띄어 써도 붙여 써도 모두 허용**되는 실무 관행입니다. 이를 오류로 지적하는 행위를 엄격히 금지합니다.
+
+② **숫자+단위 붙여쓰기**: '6가지', '3개', '10명' 등 아라비아 숫자 뒤 단위/의존 명사 붙여쓰기는 절대 띄어쓰기 오류로 지적하지 마십시오.
+
+③ **의심스러운 경우 지적 금지**: 해당 표현이 오류인지 올바른지 100% 확신할 수 없다면 지적하지 마십시오. **명백하고 확실한 오류만** 도출하십시오. (예: '데이터전 송'처럼 단어 중간에 공백이 삽입된 경우만 해당)
+
+④ **원문 그대로 올바른 표현을 오류로 간주 금지**: AI가 스스로 "이렇게 쓰면 더 낫다"고 판단하여 올바른 원문을 오류로 지적하는 할루시네이션을 엄격히 금지합니다.
 
 [출력 형식 및 필수 제약 사항]
 [제약 1] 반드시 프론트엔드 표 렌더링을 위해 아래 JSON 데이터 배열로만 출력하라. (아래 필드명을 엄격히 유지할 것)
-[제약 2] **동일한 단어, 동일한 오류를 무한 반복해서 출력하는 행위(Hallucination)를 엄격히 금지**합니다. 중복된 교정 내역은 반드시 하나로 병합하여 한 번만 출력하세요.
 {
   "score": 100,
   "inspectionScope": "<점검범위 텍스트 또는 null>",
-  "summary": "<전체 문서의 목차/섹션 리스트업 및 교정/교열 결과에 대한 종합 요약 (상세하게)>",
+  "summary": "<전체 문서의 주요 내용 분석 및 5대 품질 차원에 기반한 종합 검토 의견 (매우 상세하게)>",
   "requirementMapping": [],
   "typos": [
     {
       "page": "<페이지 번호 또는 섹션/목차명>",
-      "originalText": "<원문 문장 전체가 있을경우, 아니면 '해당 페이지 이상 없음'>",
-      "correction": "<수정 제안 문장>",
-      "errorType": "<오류 유형 (오탈자/띄어쓰기/비문/도메인 용어/이상 없음 등)>"
+      "originalText": "<원문 문장 전체 또는 결함 내용 요약>",
+      "correction": "<수정 제안 또는 구체적 보완 권고>",
+      "errorType": "<'[1. 표현 품질] 오탈자', '[2. 논리 구조] 원인-결과 불일치' 등의 상세 사유>"
     }
   ]
 }`;
@@ -203,6 +226,7 @@ export async function analyzeDocumentsWithLLM(guidelineText, artifactText, inspe
    - '부분 이행' 또는 '미이행' 시, 어떤 기술적/관리적 내용이 보완되어야 하는지 문서의 특성을 고려하여 구체적인 개선 방향을 'gap' 필드에 제시하십시오.
 4. **구조적 결함 및 정합성 수색 (typos 배열 활용)**:
    - 오탈자가 아닌, **목차-본문 불일치, 수치 간의 모순, 존재하지 않는 기능 참조** 등 문서 전체의 구조적 결함을 발견 시 'typos' 배열에 전문적으로 기록하십시오.
+   - **원문에 없는 결함을 스스로 지어내는 행위(Hallucination)를 엄격히 금지합니다.** 실제 존재하는 불일치나 모순만 지적하십시오.
 
 [출력 형식 제한]
 반드시 아래 JSON 형식으로만 출력하세요. 모든 항목은 JSON 배열 내의 개별 객체여야 합니다.
@@ -318,28 +342,17 @@ ${ragContext ? `\n${ragContext}` : ''}
                     || errMsg.toLowerCase().includes('not supported')
                     || errMsg.toLowerCase().includes('deprecated');
 
-                // 1. 에러 발생 시 항상 다음 API 키를 먼저 시도
                 if (keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
                     currentKeyIndex++;
-                    const reasonStr = response.status === 429 ? '할당량 초과' : (response.status >= 500 ? '서버 지연' : 'API 오류');
-                    if (onProgress) onProgress(`[${reasonStr}] 다음 키로 교체 시도 중 (${currentKeyIndex + 1}/${keys.length})`);
                     continue;
                 }
 
-                // 2. 모든 키를 다 썼다면 모델 교체 시도
                 if (response.status === 429 || response.status >= 500 || isModelUnavailable) {
                     modelRetries++;
                     if (modelRetries < maxModelRetries) {
                         currentKeyIndex = 0;
-                        const nextModelIndex = (currentModelIndex + 1) % FALLBACK_MODELS.length;
-                        const nextModelName = FALLBACK_MODELS[nextModelIndex].split('/').pop();
-                        const reason = isModelUnavailable && response.status !== 429 ? '모델 미지원' : (response.status === 429 ? '할당량 소진' : '서버 혼잡');
-                        const currentModelName = modelId.split('/').pop();
-                        
-                        if (onProgress) onProgress(`[${reason}] [${currentModelName}] 소진 → 5초 후 [${nextModelName}]으로 변경하여 재시도합니다.`);
-                        
+                        currentModelIndex = (currentModelIndex + 1) % FALLBACK_MODELS.length;
                         await new Promise(resolve => setTimeout(resolve, 5000));
-                        currentModelIndex = nextModelIndex;
                         continue;
                     }
                     
@@ -356,7 +369,7 @@ ${ragContext ? `\n${ragContext}` : ''}
         let content = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
 
         if (content.includes("```")) {
-            const match = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+            const match = content.match(/```(?:json)?\\s*([\\s\\S]*?)\\s*```/i);
             if (match && match[1]) {
                 content = match[1];
             } else {
@@ -365,46 +378,7 @@ ${ragContext ? `\n${ragContext}` : ''}
         }
         
         content = content.trim();
-        
-        // JSON 객체 또는 배열의 시작과 끝을 찾아 불필요한 앞뒤 문자열 제거
-        const firstBrace = content.indexOf('{');
-        const firstBracket = content.indexOf('[');
-        const lastBrace = content.lastIndexOf('}');
-        const lastBracket = content.lastIndexOf(']');
-        
-        const firstCharIndex = (firstBrace === -1) ? firstBracket : (firstBracket === -1 ? firstBrace : Math.min(firstBrace, firstBracket));
-        const lastCharIndex = Math.max(lastBrace, lastBracket);
-
-        let parsed;
-        try {
-            parsed = JSON.parse(content);
-        } catch (parseError) {
-            console.warn("JSON 파싱 에러 발생. 텍스트 잘림 현상으로 간주하여 복구를 시도합니다.", parseError);
-            try {
-                // 불완전한 마지막 요소를 잘라내고 가장 마지막으로 닫힌 객체 '}' 기준으로 문자열을 자름
-                const lastValidObjEnd = content.lastIndexOf('}');
-                if (lastValidObjEnd > -1) {
-                    let repaired = content.substring(0, lastValidObjEnd + 1);
-                    
-                    // 열린 배열/객체 괄호 짝 맞추기
-                    const openBrackets = (repaired.match(/\[/g) || []).length;
-                    const closeBrackets = (repaired.match(/\]/g) || []).length;
-                    for (let i = 0; i < (openBrackets - closeBrackets); i++) repaired += ']';
-                    
-                    const openBraces = (repaired.match(/\{/g) || []).length;
-                    const closeBraces = (repaired.match(/\}/g) || []).length;
-                    for (let i = 0; i < (openBraces - closeBraces); i++) repaired += '}';
-                    
-                    parsed = JSON.parse(repaired);
-                    console.log("JSON 복구 성공!");
-                } else {
-                    throw parseError; // 복구 불가
-                }
-            } catch (repairError) {
-                console.error("JSON 복구 실패:", repairError);
-                throw new Error("너무 많은 오류가 검출되어 AI 응답이 한도를 초과했습니다. 점검 범위를 줄여서 다시 시도해주세요.");
-            }
-        }
+        const parsed = JSON.parse(content);
 
         if (parsed.requirementMapping && Array.isArray(parsed.requirementMapping)) {
             if (!parsed.rtm) {
@@ -436,7 +410,6 @@ ${ragContext ? `\n${ragContext}` : ''}
         if (!parsed.typos) {
             parsed.typos = [];
         } else {
-            // 중복 교정 내용(무한 반복 환각) 제거 로직 추가
             const uniqueTypos = [];
             const seen = new Set();
             parsed.typos.forEach(typo => {
@@ -451,8 +424,6 @@ ${ragContext ? `\n${ragContext}` : ''}
 
         return parsed;
     } catch (e) {
-        console.error("Gemini API Error:", e);
-        if (e.message.includes("quota")) throw new Error("Gemini API 할당량이 초과되었습니다.");
         throw new Error(`Gemini 검증 실패: ${e.message}`);
     }
 }
@@ -461,7 +432,6 @@ export async function askRagQuestion(docTitle, docContent, question, apiKey, onP
     const keys = String(apiKey).split(',').map(k => k.trim()).filter(k => k.match(/^(AIza|AQ\.)/));
     if (keys.length === 0) throw new Error("유효한 Gemini API Key가 없습니다.");
 
-    // 사용량 기록 유틸리티 연동
     const recordUsage = (modelName) => {
         try {
             const usage = JSON.parse(localStorage.getItem('gemini_model_usage') || '{}');
@@ -474,109 +444,42 @@ export async function askRagQuestion(docTitle, docContent, question, apiKey, onP
     };
 
     const systemPrompt = `당신은 ISMP 산출물 전문 Q&A 어시스턴트입니다. 
-제공된 문서 [${docTitle}]의 내용을 바탕으로 사용자의 질문에 전문적이고 친절하게 답변하십시오. 
-문서에 명시되지 않은 내용에 대해서는 추측하지 말고 문서에서 해당 내용을 찾을 수 없다고 답변하십시오. 
-가능한 경우 답변 시 문서의 구절을 인용하거나 요약하여 근거를 제시하십시오.`;
+제공된 문서 [${docTitle}]의 내용을 바탕으로 사용자의 질문에 전문적이고 친절하게 답변하십시오.`;
 
     const userInput = `
-[시스템 지시사항]
-${systemPrompt}
-
 [문서 제목]: ${docTitle}
-[문서 내용]:
-${(docContent || '').substring(0, 800000)}
-
 [사용자 질문]: ${question}
 `;
 
-    // 메인 엔진과 동일한 모델 목록
     const FALLBACK_MODELS = [
         "models/gemini-3-flash",
         "models/gemini-2.5-pro",
-        "models/gemini-2.5-flash",
-        "models/gemini-2.5-flash-lite",
-        "models/gemini-1.5-flash",
-        "models/gemini-1.5-pro",
-        "models/gemini-1.5-flash-8b",
-        "models/gemini-2.0-flash-exp"
+        "models/gemini-2.5-flash"
     ];
 
     let currentKeyIndex = 0;
     let currentModelIndex = 0;
 
-    const fetchWithRetry = async (maxModelRetries = FALLBACK_MODELS.length) => {
-        let modelRetries = 0;
+    const fetchWithRetry = async () => {
+        const activeKey = keys[currentKeyIndex];
+        const modelId = FALLBACK_MODELS[currentModelIndex];
+        const fetchUrl = `https://generativelanguage.googleapis.com/v1beta/${modelId}:generateContent?key=${activeKey}`;
         
-        while (modelRetries < maxModelRetries) {
-            const activeKey = keys[currentKeyIndex];
-            const modelId = FALLBACK_MODELS[currentModelIndex];
-            const fetchUrl = `https://generativelanguage.googleapis.com/v1beta/${modelId}:generateContent?key=${activeKey}`;
-            
-            if (onProgress) {
-                const keyInfo = keys.length > 1 ? ` (키 ${currentKeyIndex + 1}/${keys.length} 사용 중)` : '';
-                onProgress(`${modelId.split('/').pop()} 모델로 답변 생성 중...${keyInfo}`);
-            }
+        const response = await fetch(fetchUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                contents: [{ role: "user", parts: [{ text: userInput }] }]
+            })
+        });
 
-            try {
-                const response = await fetch(fetchUrl, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        contents: [{ role: "user", parts: [{ text: userInput }] }],
-                        generationConfig: { temperature: 0.2, maxOutputTokens: 2048 }
-                    })
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    const candidate = data.candidates?.[0];
-                    if (candidate?.finishReason === 'SAFETY') return "안전 정책상 답변을 생성할 수 없습니다.";
-                    const answer = candidate?.content?.parts?.[0]?.text;
-                    if (answer) {
-                        recordUsage(modelId); // 사용량 기록
-                        return answer;
-                    }
-                    throw new Error("AI가 빈 답변을 반환했습니다.");
-                }
-
-                const errData = await response.json().catch(() => ({}));
-                const errMsg = errData.error?.message || response.statusText || "";
-                const isModelUnavailable = response.status === 404
-                    || response.status === 400
-                    || errMsg.toLowerCase().includes('not found')
-                    || errMsg.toLowerCase().includes('not supported')
-                    || errMsg.toLowerCase().includes('deprecated');
-
-                // 1. 에러 발생 시 항상 다음 API 키를 먼저 시도
-                if (keys.length > 1 && (currentKeyIndex + 1) < keys.length) {
-                    currentKeyIndex++;
-                    if (onProgress) onProgress(`API 오류로 다음 키로 교체 시도 중 (${currentKeyIndex + 1}/${keys.length})`);
-                    continue;
-                }
-
-                // 2. 모든 키를 다 썼다면 모델 교체 시도
-                if (response.status === 429 || response.status >= 500 || isModelUnavailable) {
-                    modelRetries++;
-                    if (modelRetries < maxModelRetries) {
-                        currentKeyIndex = 0;
-                        currentModelIndex = (currentModelIndex + 1) % FALLBACK_MODELS.length;
-                        const reason = isModelUnavailable ? '모델 미지원' : (response.status === 429 ? '할당량 소진' : '서버 혼잡');
-                        if (onProgress) onProgress(`[${reason}] 다음 가용 모델로 전환하여 재시도합니다.`);
-                        await new Promise(resolve => setTimeout(resolve, 2000));
-                        continue;
-                    }
-                    throw new Error("모든 API 키와 모델의 가용 한도가 소진되었습니다.");
-                }
-                
-                throw new Error(errMsg || response.statusText);
-            } catch (e) {
-                if (modelRetries >= maxModelRetries - 1) throw e;
-                modelRetries++;
-                currentKeyIndex = 0;
-                currentModelIndex = (currentModelIndex + 1) % FALLBACK_MODELS.length;
-                await new Promise(r => setTimeout(r, 1000));
-            }
+        if (response.ok) {
+            const data = await response.json();
+            const answer = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            recordUsage(modelId);
+            return answer;
         }
+        throw new Error("Failed to fetch");
     };
 
     return await fetchWithRetry();

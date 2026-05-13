@@ -79,7 +79,7 @@ function App() {
       main: 'AI 산출물 검증',
       typo: 'AI 교정교열',
       law: 'AI 법률 자문(제미나이)',
-      'law-mcp': 'AI 법률 자문(MCP)',
+      'law-mcp': 'AI 법률 자문(로컬 RAG)',
       erd: 'AI ERD 설계',
       ppt: 'PPT 생성(표준산출물)',
       library: '참고자료 라이브러리',
@@ -140,7 +140,7 @@ function App() {
     { id: 'main', label: 'AI 산출물 검증', icon: Shield, color: 'var(--accent-blue)' },
     { id: 'typo', label: 'AI 교정교열', icon: CheckCircle2, color: 'var(--accent-purple)' },
     { id: 'law', label: 'AI 법률 자문(제미나이)', icon: MessageSquare, color: 'var(--success-color)' },
-    { id: 'law-mcp', label: 'AI 법률 자문(MCP)', icon: MessageSquare, color: 'var(--accent-purple)' },
+    { id: 'law-mcp', label: 'AI 법률 자문(로컬 RAG)', icon: MessageSquare, color: 'var(--accent-purple)' },
     { id: 'erd', label: 'AI ERD 설계', icon: Database, color: 'var(--warning-color)' },
     { id: 'ppt', label: 'PPT 생성(표준산출물)', icon: FileText, color: '#f97316' },
     { id: 'meeting', label: 'AI 회의록 생성', icon: Mic2, color: '#8b5cf6' },
@@ -243,7 +243,7 @@ function App() {
 
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', marginRight: '8px' }}>
               <span className="mobile-hide-text" style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>Last Update</span>
-              <span style={{ fontSize: '12px', color: 'var(--accent-blue)', fontWeight: 700, fontFamily: 'monospace' }}>2026. 05. 01 01:10</span>
+              <span style={{ fontSize: '12px', color: 'var(--accent-blue)', fontWeight: 700, fontFamily: 'monospace' }}>2026. 05. 10 01:20</span>
             </div>
             
             <button 

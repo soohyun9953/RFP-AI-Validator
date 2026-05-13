@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Scale, User, Bot, Loader2, Sparkles, X, Copy, Check } from 'lucide-react';
-import { askLawAssistant, askGeneralLawAssistant } from '../lawAnalyzer';
+import { askLocalRagAssistant, askGeneralLawAssistant } from '../lawAnalyzer';
 import { refDB } from '../utils/db';
 
 function LawConsultant({ apiKey, isMcpMode = false }) {
   const [messages, setMessages] = useState([
     { role: 'model', text: isMcpMode 
-        ? '안녕하세요! 실시간 법령 조회가 가능한 [MCP 기반] AI 법률 자문입니다.\n\n지능형 검색 도구를 사용하여 최신 법령을 직접 조회하고 답변해 드립니다.\n(※ MCP 모드는 정확한 검색을 위해 여러 번의 AI 호출이 발생하여 토큰 소모량이 많을 수 있습니다.)'
+        ? '안녕하세요! 완전한 로컬(오프라인) 환경에서 구동되는 [로컬 RAG 기반] AI 법률 자문입니다.\n\n지능형 검색 도구를 사용하여 자체 벡터 DB에 내장된 법령을 조회하고 답변해 드립니다.\n(현재 포함 법령: 전자정부법, 지능정보화기본법, 국가계약법, 소프트웨어진흥법, 민법 등)'
         : '안녕하세요! [일반 지식 기반] AI 법률 자문입니다.\n\n실시간 검색 없이 Gemini의 내부 지식만으로 빠르게 답변해 드립니다. 가벼운 규정 확인에 적합하며 토큰 사용이 경제적입니다.' }
   ]);
   const [input, setInput] = useState('');
@@ -159,8 +159,8 @@ function LawConsultant({ apiKey, isMcpMode = false }) {
     try {
       let responseText = "";
       if (isMcpMode) {
-        responseText = await askLawAssistant(userMessage.text, apiKey, messages, (keyword) => {
-          setMcpQueryStatus(`LexGuard MCP에서 '${keyword}' 관련 실시간 법령 조회 중...`);
+        responseText = await askLocalRagAssistant(userMessage.text, apiKey, messages, (keyword) => {
+          setMcpQueryStatus(`Local RAG에서 '${keyword}' 관련 법령 검색 중...`);
         });
       } else {
         responseText = await askGeneralLawAssistant(userMessage.text, apiKey, messages);
@@ -182,18 +182,18 @@ function LawConsultant({ apiKey, isMcpMode = false }) {
         {isMcpMode ? <Scale size={24} color="var(--accent-purple)" /> : <Sparkles size={24} color="var(--success-color)" />}
         <div>
           <h2 style={{ margin: 0, fontSize: '18px', color: 'var(--text-primary)' }}>
-            {isMcpMode ? 'AI 법률/규정 자문 에이전트 (MCP)' : 'AI 법률 자문(제미나이)'}
+            {isMcpMode ? 'AI 법률/규정 자문 (로컬 RAG)' : 'AI 법률 자문(제미나이)'}
           </h2>
           <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
-            {isMcpMode ? '한국 법령(korean-law-mcp) 기반 실무 검토 및 해설' : '실시간 검색 없는 Gemini 내부 지식 기반 빠른 해설'}
-            {isMcpMode && <span style={{ marginLeft: '10px', color: '#f87171', fontWeight: 600, fontSize: '11px' }}>※ 실시간 검색 시 토큰 소모량이 많을 수 있음</span>}
+            {isMcpMode ? '내부 벡터 DB 기반 실무 검토 및 오프라인 해설 지원' : '실시간 검색 없는 Gemini 내부 지식 기반 빠른 해설'}
+            {isMcpMode && <span style={{ marginLeft: '10px', color: '#10b981', fontWeight: 600, fontSize: '11px' }}>※ 완전한 로컬 환경에서 안전하게 구동됩니다.</span>}
           </p>
         </div>
         <button
           onClick={() => {
             if (window.confirm('대화 내역을 모두 삭제하고 초기화하시겠습니까?')) {
               const initialText = isMcpMode
-                ? '안녕하세요! 실시간 법령 조회가 가능한 [MCP 기반] AI 법률 자문입니다.\n\n지능형 검색 도구를 사용하여 최신 법령을 직접 조회하고 답변해 드립니다.\n(예시: "소프트웨어 진흥법 상 대기업 참여제한 예외 사유 알려줘")'
+                ? '안녕하세요! 완전한 로컬(오프라인) 환경에서 구동되는 [로컬 RAG 기반] AI 법률 자문입니다.\n\n지능형 검색 도구를 사용하여 자체 벡터 DB에 내장된 법령을 조회하고 답변해 드립니다.\n(예시: "전자정부법상 시스템 감리 대상은 무엇인가요?")'
                 : '안녕하세요! [일반 지식 기반] AI 법률 자문입니다.\n\n실시간 검색 없이 Gemini의 내부 지식만으로 빠르게 답변해 드립니다. 가벼운 규정 확인에 적합합니다.';
               setMessages([{ role: 'model', text: initialText }]);
               setInput(''); // 입력창도 초기화

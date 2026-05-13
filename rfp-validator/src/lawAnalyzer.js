@@ -1,5 +1,6 @@
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 const MCP_SERVER_URL = 'https://lexguard-mcp.onrender.com/mcp';
+const LOCAL_RAG_URL = 'http://localhost:8000/api/query';
 
 async function callLexGuardMcp(query) {
   try {
@@ -352,4 +353,40 @@ export async function askGeneralLawAssistant(query, apiKey, history = []) {
 
   const data = await generateWithRetry(contents);
   return data.candidates?.[0]?.content?.parts?.[0]?.text || "답변을 생성할 수 없습니다.";
+}
+
+// Local RAG를 이용한 법률 자문 (RFP Validator 연동용)
+export async function askLocalRagAssistant(query, apiKey, history = [], onRagCall = null) {
+  if (!apiKey) throw new Error("Gemini API Key가 필요합니다.");
+
+  const systemInstruction = `
+당신은 대한민국 공공기관의 IT 및 공공사업 관련 규정, 법령, 가이드라인을 깊이 있게 이해하고 있는 'AI 법률 자문 에이전트(Local RAG 기반)'입니다.
+
+[핵심 지침]
+1. 사용자의 질문에 답변하기 위해 전달된 '검색된 법령(Local RAG 데이터)'을 최우선으로 참고하세요.
+2. 전달된 문맥 데이터(검색 결과)를 바탕으로 명확하고 전문적인 어조로 답변을 구성하세요.
+3. 법령명 및 관련 근거를 제시할 때는 반드시 법령명을 「」으로 감싸서 정확히 표기하고, 조문 번호도 포함하세요. (예: 「소프트웨어 진흥법」 제43조 제1항)
+4. 실무자(PM, 공무원 등)가 이해하기 쉽도록 핵심을 요약하고, 긴 텍스트는 불릿 기호(-, •)를 사용하여 가독성 있게 구조화하세요.
+5. 답변의 서두나 말미에 '본 답변은 법적 판단을 대신하지 않으며 참고용입니다 (Local RAG)'라는 판단 유보 문구를 가볍게 포함해 주세요.
+  `;
+
+  // 1. RAG 백엔드에 쿼리 요청
+  if (onRagCall) onRagCall(query);
+  try {
+    const ragResponse = await fetch(LOCAL_RAG_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: query })
+    });
+    
+    if (ragResponse.ok) {
+      const data = await ragResponse.json();
+      return data.answer || "로컬 LLM이 답변을 생성하지 못했습니다.";
+    } else {
+      throw new Error(`RAG Server Error: ${ragResponse.status}`);
+    }
+  } catch(e) {
+    console.error("Local RAG Query failed:", e);
+    return "로컬 RAG 서버 통신에 실패했습니다. (서버가 실행 중인지 확인해주세요)";
+  }
 }

@@ -81,7 +81,7 @@ function TypoValidator({ apiKey }) {
           </div>
 
           <h2 className="pulse-text" style={{ margin: '0 0 16px', fontSize: '24px', color: 'var(--text-primary)', fontWeight: 700, letterSpacing: '-0.5px' }}>
-            {analysisStage === 1 ? '전수 문장 단위 도출 중...' : 'AI 품질 및 문체 점검 중...'}
+            {analysisStage === 1 ? '전수 문장 단위 도출 중...' : 'AI 5대 차원 심층 품질 점검 중...'}
           </h2>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
@@ -92,7 +92,7 @@ function TypoValidator({ apiKey }) {
             </div>
             <div className={`page-container active`} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '15px', opacity: analysisStage >= 2 ? 1 : 0.3 }}>
                 <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: analysisStage === 2 ? 'var(--accent-blue)' : 'rgba(255,255,255,0.1)', boxShadow: analysisStage === 2 ? '0 0 10px var(--accent-blue)' : 'none' }}></div>
-                <span style={{ color: analysisStage === 2 ? 'var(--text-primary)' : 'var(--text-muted)' }}>2단계: AI 문맥 분석 및 교정교열 가이드 생성</span>
+                <span style={{ color: analysisStage === 2 ? 'var(--text-primary)' : 'var(--text-muted)' }}>2단계: 5대 차원 심층 품질 분석 및 개선 가이드 생성</span>
             </div>
           </div>
 
@@ -110,7 +110,7 @@ function TypoValidator({ apiKey }) {
           <p style={{ marginTop: '24px', fontSize: '14px', color: 'var(--text-muted)', maxWidth: '400px', textAlign: 'center', lineHeight: '1.6' }}>
             {analysisStage === 1 
                 ? '분석 대상 문서의 모든 문장을 하나하나 읽어 들이며 분석 대상을 추출하고 있습니다.' 
-                : '추출된 문장들의 오탈자, 비문, 용어 일관성을 수석 감리원 수준으로 점검하고 있습니다.'}
+                : '산출물의 오탈자는 물론 논리 구조, 완결성, 사업 정합성을 5대 차원에서 심층 점검하고 있습니다.'}
           </p>
         </div>
       ) : resultData ? (
@@ -148,7 +148,7 @@ function TypoValidator({ apiKey }) {
           <div style={{ maxWidth: '420px', textAlign: 'center', lineHeight: '1.7', fontSize: '15px', color: 'var(--text-secondary)' }}>
             <p style={{ marginBottom: '16px' }}>좌측 영역에 <strong style={{ color: 'var(--text-primary)' }}>&lt;검증 대상 문서&gt;</strong> 내용을 입력하거나 파일을 업로드하세요.</p>
             <div style={{ background: 'rgba(168, 85, 247, 0.05)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(168, 85, 247, 0.1)', color: 'var(--text-muted)', fontSize: '13px' }}>
-                💡 <span style={{ color: 'var(--accent-purple)', fontWeight: 600 }}>Tip:</span> 전문적인 오탈자 및 문체 교정을 위해 우측 상단에 Gemini API Key 입력을 확인해 주세요.
+                💡 <span style={{ color: 'var(--accent-purple)', fontWeight: 600 }}>Tip:</span> 전문적인 5대 차원 심층 품질 점검을 위해 우측 상단에 Gemini API Key 입력을 확인해 주세요.
             </div>
           </div>
         </div>
