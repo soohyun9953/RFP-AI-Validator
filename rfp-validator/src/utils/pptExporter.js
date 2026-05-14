@@ -929,3 +929,230 @@ export async function processPptBatch(pptFile, options) {
     return blob;
 }
 
+/**
+ * PPT 파일의 모든 슬라이드 객체에 스마트 애니메이션(순차적 나타나기)을 추가합니다.
+ * @param {File} pptFile 
+ * @param {Object} options { animationType: 'fade' | 'appear' }
+ */
+/**
+ * PPT 파일에 스마트 애니메이션 또는 슬라이드 전환 효과를 추가합니다.
+ * @param {File} pptFile 
+ * @param {Object} options { animationType: 'fade' | 'appear' | 'transition', perSlideConfigs: Array, useGrouping: boolean }
+ */
+export async function addSmartAnimationsToPpt(pptFile, options = {}) {
+    const { animationType = 'fade', perSlideConfigs = [], useGrouping = false } = options;
+    const arrayBuffer = await pptFile.arrayBuffer();
+    
+    const zip = new JSZip();
+    await zip.loadAsync(arrayBuffer);
+    
+    const slideFiles = Object.keys(zip.files)
+        .filter(k => k.startsWith('ppt/slides/slide') && k.endsWith('.xml'))
+        .sort((a, b) => {
+            const numA = parseInt(a.match(/\d+/)[0]);
+            const numB = parseInt(b.match(/\d+/)[0]);
+            return numA - numB;
+        });
+
+    const parser = new DOMParser();
+    const serializer = new XMLSerializer();
+
+    for (let idx = 0; idx < slideFiles.length; idx++) {
+        const slidePath = slideFiles[idx];
+        const config = perSlideConfigs[idx] || { enabled: true, type: animationType, useGrouping: useGrouping };
+        
+        const content = await zip.file(slidePath).async('string');
+        const xmlDoc = parser.parseFromString(content, 'application/xml');
+        const nsP = "http://schemas.openxmlformats.org/presentationml/2006/main";
+
+        // 1. 기존 애니메이션 및 전환 효과 초기화
+        const existingTimings = xmlDoc.getElementsByTagNameNS(nsP, 'timing');
+        while (existingTimings.length > 0) existingTimings[0].parentNode.removeChild(existingTimings[0]);
+        
+        const existingTransitions = xmlDoc.getElementsByTagNameNS(nsP, 'transition');
+        while (existingTransitions.length > 0) existingTransitions[0].parentNode.removeChild(existingTransitions[0]);
+
+        if (!config.enabled) {
+            zip.file(slidePath, serializer.serializeToString(xmlDoc));
+            continue;
+        }
+
+        const currentType = config.type || animationType;
+
+        // 2. '전환 효과(Transition)' 모드인 경우
+        if (currentType === 'transition') {
+            const transitionNode = xmlDoc.createElementNS(nsP, 'p:transition');
+            transitionNode.setAttribute('dur', '1000');
+            const fadeNode = xmlDoc.createElementNS(nsP, 'p:fade');
+            transitionNode.appendChild(fadeNode);
+            
+            // 주입 위치: cSld, clrMapOvr 뒤, timing, extLst 앞
+            const timing = xmlDoc.getElementsByTagNameNS(nsP, 'timing')[0];
+            const extLst = xmlDoc.getElementsByTagNameNS(nsP, 'extLst')[0];
+            const beforeNode = timing || extLst;
+            
+            if (beforeNode && beforeNode.parentNode === xmlDoc.documentElement) {
+                xmlDoc.documentElement.insertBefore(transitionNode, beforeNode);
+            } else {
+                xmlDoc.documentElement.appendChild(transitionNode);
+            }
+        } 
+        // 3. '객체 애니메이션' 모드인 경우
+        else {
+            const currentGrouping = config.useGrouping !== undefined ? config.useGrouping : useGrouping;
+            const shapesWithPos = [];
+            const processElements = (tagName) => {
+                const elements = xmlDoc.getElementsByTagNameNS('*', tagName);
+                for (let i = 0; i < elements.length; i++) {
+                    const el = elements[i];
+                    const cNvPr = el.getElementsByTagNameNS('*', 'cNvPr')[0];
+                    if (!cNvPr) continue;
+                    const id = cNvPr.getAttribute('id');
+                    const name = (cNvPr.getAttribute('name') || '').toLowerCase();
+                    const off = el.getElementsByTagNameNS('*', 'off')[0];
+                    let x = 0, y = 0;
+                    if (off) {
+                        x = parseInt(off.getAttribute('x') || '0');
+                        y = parseInt(off.getAttribute('y') || '0');
+                    }
+                    if (name.includes('title') || name.includes('header') || name.includes('footer') || 
+                        name.includes('number') || name.includes('page') || name.includes('placeholder')) continue;
+                    if (y < 1100000) continue;
+                    shapesWithPos.push({ id, x, y });
+                }
+            };
+
+            processElements('sp');
+            processElements('pic');
+            processElements('graphicFrame');
+
+            if (shapesWithPos.length > 0) {
+                shapesWithPos.sort((a, b) => {
+                    const yDiff = a.y - b.y;
+                    if (Math.abs(yDiff) < 100000) return a.x - b.x;
+                    return yDiff;
+                });
+
+                const sortedIds = shapesWithPos.map(s => s.id);
+                const timingXml = generateTimingXml(sortedIds, currentType, currentGrouping);
+                const timingDoc = parser.parseFromString(timingXml, 'application/xml');
+                const timingNode = xmlDoc.importNode(timingDoc.documentElement, true);
+                
+                const extLst = xmlDoc.getElementsByTagNameNS(nsP, 'extLst')[0];
+                if (extLst && extLst.parentNode === xmlDoc.documentElement) {
+                    xmlDoc.documentElement.insertBefore(timingNode, extLst);
+                } else {
+                    xmlDoc.documentElement.appendChild(timingNode);
+                }
+            }
+        }
+        
+        zip.file(slidePath, serializer.serializeToString(xmlDoc));
+    }
+
+    const modifiedBlob = await zip.generateAsync({
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    });
+
+    return modifiedBlob;
+}
+
+/**
+ * OpenXML p:timing 구조 생성
+ * @param {Array} shapeIds 
+ * @param {string} type 
+ * @param {boolean} useGrouping true이면 모든 객체가 한 번의 클릭으로 동시에 나타남
+ */
+function generateTimingXml(shapeIds, type, useGrouping = false) {
+    let nodes = '';
+    
+    if (useGrouping) {
+        // 모든 객체를 하나의 p:par 안에 넣어서 동시에 실행
+        let groupChildNodes = '';
+        shapeIds.forEach((id, idx) => {
+            groupChildNodes += `
+                <p:set>
+                    <p:cBhvr>
+                        <p:cTn id="${idx + 1000}" dur="1" fill="hold"><p:stCondLst><p:cond delay="0"/></p:stCondLst></p:cTn>
+                        <p:tgtEl><p:spTgt spid="${id}"/></p:tgtEl>
+                        <p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst>
+                    </p:cBhvr>
+                    <p:to><p:str val="visible"/></p:to>
+                </p:set>
+                <p:anim filter="${type === 'fade' ? 'fade(in)' : 'appear'}" calcmode="lin" transition="in">
+                    <p:cBhvr>
+                        <p:cTn id="${idx + 2000}" dur="${type === 'fade' ? '500' : '1'}" fill="hold"><p:stCondLst><p:cond delay="0"/></p:stCondLst></p:cTn>
+                        <p:tgtEl><p:spTgt spid="${id}"/></p:tgtEl>
+                    </p:cBhvr>
+                </p:anim>`;
+        });
+
+        nodes = `
+        <p:par>
+            <p:cTn id="10" dur="indefinite" fill="hold" nodeType="clickEffect">
+                <p:stCondLst><p:cond delay="0"/></p:stCondLst>
+                <p:childTnLst>
+                    ${groupChildNodes}
+                </p:childTnLst>
+            </p:cTn>
+        </p:par>`;
+    } else {
+        // 기존: 개체별 순차 실행
+        shapeIds.forEach((id, idx) => {
+            nodes += `
+            <p:par>
+                <p:cTn id="${idx + 10}" dur="indefinite" fill="hold" nodeType="clickEffect">
+                    <p:stCondLst><p:cond delay="0"/></p:stCondLst>
+                    <p:childTnLst>
+                        <p:set>
+                            <p:cBhvr>
+                                <p:cTn id="${idx + 1000}" dur="1" fill="hold"><p:stCondLst><p:cond delay="0"/></p:stCondLst></p:cTn>
+                                <p:tgtEl><p:spTgt spid="${id}"/></p:tgtEl>
+                                <p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst>
+                            </p:cBhvr>
+                            <p:to><p:str val="visible"/></p:to>
+                        </p:set>
+                        <p:anim filter="${type === 'fade' ? 'fade(in)' : 'appear'}" calcmode="lin" transition="in">
+                            <p:cBhvr>
+                                <p:cTn id="${idx + 2000}" dur="${type === 'fade' ? '500' : '1'}" fill="hold"><p:stCondLst><p:cond delay="0"/></p:stCondLst></p:cTn>
+                                <p:tgtEl><p:spTgt spid="${id}"/></p:tgtEl>
+                            </p:cBhvr>
+                        </p:anim>
+                    </p:childTnLst>
+                </p:cTn>
+            </p:par>`;
+        });
+    }
+
+    return `
+    <p:timing xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+        <p:tnLst>
+            <p:par>
+                <p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot">
+                    <p:childTnLst>
+                        <p:seq type="nextClick" concurrent="1" nextAc="seek">
+                            <p:cTn id="2" dur="indefinite" nodeType="mainSeq">
+                                <p:childTnLst>
+                                    ${nodes}
+                                </p:childTnLst>
+                            </p:cTn>
+                        </p:seq>
+                    </p:childTnLst>
+                </p:cTn>
+            </p:par>
+        </p:tnLst>
+    </p:timing>`;
+}
+
+/**
+ * PPT 파일의 슬라이드 개수를 반환합니다.
+ */
+export async function getPptSlideCount(pptFile) {
+    const arrayBuffer = await pptFile.arrayBuffer();
+    const zip = new JSZip();
+    await zip.loadAsync(arrayBuffer);
+    const slideFiles = Object.keys(zip.files).filter(k => k.startsWith('ppt/slides/slide') && k.endsWith('.xml'));
+    return slideFiles.length;
+}
+
