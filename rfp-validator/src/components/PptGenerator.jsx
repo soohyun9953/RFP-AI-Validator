@@ -858,7 +858,7 @@ export default function PptGenerator() {
                                     className={`interactive ${animationType === 'transition' ? 'active' : ''}`}
                                     onClick={() => updateAllSlideAnimations(null, 'transition', null)}
                                     style={{
-                                        flex: 1, padding: '12px', borderRadius: '8px', border: 'none',
+                                        flex: 1, padding: '12px', borderRadius: '8px',
                                         background: animationType === 'transition' ? 'rgba(168, 85, 247, 0.2)' : 'rgba(255,255,255,0.05)',
                                         color: animationType === 'transition' ? '#c084fc' : 'var(--text-secondary)',
                                         cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
@@ -873,7 +873,7 @@ export default function PptGenerator() {
                                     className={`interactive ${animationType === 'fade' ? 'active' : ''}`}
                                     onClick={() => updateAllSlideAnimations(null, 'fade', null)}
                                     style={{
-                                        flex: 1, padding: '12px', borderRadius: '8px', border: 'none',
+                                        flex: 1, padding: '12px', borderRadius: '8px',
                                         background: animationType === 'fade' ? 'rgba(168, 85, 247, 0.2)' : 'rgba(255,255,255,0.05)',
                                         color: animationType === 'fade' ? '#c084fc' : 'var(--text-secondary)',
                                         cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
@@ -888,7 +888,7 @@ export default function PptGenerator() {
                                     className={`interactive ${animationType === 'appear' ? 'active' : ''}`}
                                     onClick={() => updateAllSlideAnimations(null, 'appear', null)}
                                     style={{
-                                        flex: 1, padding: '12px', borderRadius: '8px', border: 'none',
+                                        flex: 1, padding: '12px', borderRadius: '8px',
                                         background: animationType === 'appear' ? 'rgba(168, 85, 247, 0.2)' : 'rgba(255,255,255,0.05)',
                                         color: animationType === 'appear' ? '#c084fc' : 'var(--text-secondary)',
                                         cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
