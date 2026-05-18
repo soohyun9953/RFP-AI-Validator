@@ -34,6 +34,7 @@ export default function PptGenerator() {
     const [fontSize, setFontSize] = useState('');
     const [applyDesignChecked, setApplyDesignChecked] = useState(false);
     const [applyTableDesignChecked, setApplyTableDesignChecked] = useState(false);
+    const [applyFirstRowHeaderStyle, setApplyFirstRowHeaderStyle] = useState(true); // 옵션 E 하위 옵션: 첫 행 특별 포맷팅 적용 여부
     const [designTargetText, setDesignTargetText] = useState('');
     const [isProcessingBatch, setIsProcessingBatch] = useState(false);
     const [isDraggingBatch, setIsDraggingBatch] = useState(false);
@@ -346,6 +347,7 @@ export default function PptGenerator() {
                         fontSizeRules: parsedFontSizeRules,
                         applyDesign: applyDesignChecked, 
                         applyTableDesign: applyTableDesignChecked, 
+                        applyFirstRowHeaderStyle: applyFirstRowHeaderStyle, // 옵션 E 하위 옵션 주입
                         targetText: designTargetText 
                     };
                     const modifiedBlob = await processPptBatch(file, options);
@@ -388,6 +390,7 @@ export default function PptGenerator() {
                 setFontSize('');
                 setApplyDesignChecked(false);
                 setApplyTableDesignChecked(false);
+                setApplyFirstRowHeaderStyle(true); // 하위 옵션 상태 리셋
                 setDesignTargetText('');
             } else {
                 setErrorMsg('처리된 파일이 없습니다. 변경 대상 텍스트나 디자인 요소가 존재하는지 확인해주세요.');
@@ -815,8 +818,25 @@ export default function PptGenerator() {
                                     옵션 E: 테이블(표) 표준 디자인 일괄 변경 적용
                                 </label>
                                 <div style={{ paddingLeft: '28px', fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                                    💡 모든 표 테두리 실선 0.5pt (#7F7F7F), 첫 행 배경색 RGB(0,114,186), 첫 행의 내부 실선만 흰색, 첫 행 글씨는 흰색 11pt KoPub동음체Bold로 통일성 있게 강제 포맷팅합니다.
+                                    💡 모든 표 테두리 실선 0.5pt (#7F7F7F)가 기본 적용되며, 첫 행의 특별 포맷팅을 하위 옵션으로 선택 제어할 수 있습니다.
                                 </div>
+                                
+                                {applyTableDesignChecked && (
+                                    <div className="animate-slide-up" style={{ paddingLeft: '28px', display: 'flex', flexDirection: 'column', gap: '8px', borderLeft: '2px solid rgba(168, 85, 247, 0.3)', marginTop: '4px' }}>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--text-primary)', fontWeight: 600 }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={applyFirstRowHeaderStyle}
+                                                onChange={(e) => setApplyFirstRowHeaderStyle(e.target.checked)}
+                                                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#a855f7' }}
+                                            />
+                                            첫 번째 행(헤더) 특별 포맷팅 적용
+                                        </label>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4', paddingLeft: '24px' }}>
+                                            (첫 행 배경 RGB(0,114,186), 글자 흰색 11pt KoPub동음체Bold, 첫 행 내부 실선만 흰색 적용)
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 

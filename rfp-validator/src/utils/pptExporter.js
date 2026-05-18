@@ -815,7 +815,8 @@ export async function processPptBatch(pptFile, options) {
                         reversedBNames.forEach(bName => {
                             let borderColor = '7F7F7F'; // 기본 회색 (#7F7F7F)
                             
-                            if (rIdx === 0) {
+                            // 첫 번째 행이고, 첫 행 특별 포맷팅 옵션(applyFirstRowHeaderStyle)이 활성화된 경우에만 내부 실선 흰색 적용
+                            if (rIdx === 0 && options.applyFirstRowHeaderStyle !== false) {
                                 if (bName === 'lnB') {
                                     // 첫 행의 아래선은 첫째 행 and 둘째 행 사이의 내부 수평 실선이므로 흰색 적용
                                     borderColor = 'FFFFFF';
@@ -830,6 +831,9 @@ export async function processPptBatch(pptFile, options) {
                                     // 첫 행의 위선은 표 전체의 맨 위 외곽선이므로 회색 고정
                                     borderColor = '7F7F7F';
                                 }
+                            } else {
+                                // 일반 셀 또는 첫 행 특별 포맷팅 옵션이 꺼진 경우: 외곽선 및 내부선 모두 0.5pt 회색 고정
+                                borderColor = '7F7F7F';
                             }
                             
                             const ln = xmlDoc.createElementNS(nsA, `a:${bName}`);
@@ -851,8 +855,8 @@ export async function processPptBatch(pptFile, options) {
                             tcPr.insertBefore(ln, tcPr.firstChild);
                         });
                         
-                        // [규칙 2]: 첫 번째 행 (rIdx === 0) 인 경우 특별 포맷팅 적용
-                        if (rIdx === 0) {
+                        // [규칙 2]: 첫 번째 행 (rIdx === 0) 이고 첫 행 특별 포맷팅 옵션이 켜져 있을 때만 특별 포맷팅 적용
+                        if (rIdx === 0 && options.applyFirstRowHeaderStyle !== false) {
                             // 1. 셀 배경색 채우기: RGB 0,112,192 (#0070C0)
                             let existingFill = null;
                             for (let k = 0; k < tcPr.childNodes.length; k++) {
