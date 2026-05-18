@@ -821,22 +821,44 @@ export default function PptGenerator() {
                                     💡 모든 표 테두리 실선 0.5pt (#7F7F7F)가 기본 적용되며, 첫 행의 특별 포맷팅을 하위 옵션으로 선택 제어할 수 있습니다.
                                 </div>
                                 
-                                {applyTableDesignChecked && (
-                                    <div className="animate-slide-up" style={{ paddingLeft: '28px', display: 'flex', flexDirection: 'column', gap: '8px', borderLeft: '2px solid rgba(168, 85, 247, 0.3)', marginTop: '4px' }}>
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--text-primary)', fontWeight: 600 }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={applyFirstRowHeaderStyle}
-                                                onChange={(e) => setApplyFirstRowHeaderStyle(e.target.checked)}
-                                                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#a855f7' }}
-                                            />
-                                            첫 번째 행(헤더) 특별 포맷팅 적용
-                                        </label>
-                                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4', paddingLeft: '24px' }}>
-                                            (첫 행 배경 RGB(0,114,186), 글자 흰색 11pt KoPub동음체Bold, 첫 행 내부 실선만 흰색 적용)
-                                        </div>
+                                <div style={{ 
+                                    paddingLeft: '28px', 
+                                    display: 'flex', 
+                                    flexDirection: 'column', 
+                                    gap: '8px', 
+                                    borderLeft: '2px solid ' + (applyTableDesignChecked ? 'rgba(168, 85, 247, 0.5)' : 'rgba(255, 255, 255, 0.1)'), 
+                                    marginTop: '4px',
+                                    opacity: applyTableDesignChecked ? 1 : 0.45,
+                                    pointerEvents: applyTableDesignChecked ? 'auto' : 'none',
+                                    transition: 'all 0.3s ease'
+                                }}>
+                                    <label style={{ 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        gap: '8px', 
+                                        cursor: applyTableDesignChecked ? 'pointer' : 'not-allowed', 
+                                        fontSize: '13px', 
+                                        color: applyTableDesignChecked ? 'var(--text-primary)' : 'var(--text-muted)', 
+                                        fontWeight: 600 
+                                    }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={applyFirstRowHeaderStyle}
+                                            disabled={!applyTableDesignChecked}
+                                            onChange={(e) => setApplyFirstRowHeaderStyle(e.target.checked)}
+                                            style={{ 
+                                                width: '16px', 
+                                                height: '16px', 
+                                                cursor: applyTableDesignChecked ? 'pointer' : 'not-allowed', 
+                                                accentColor: '#a855f7' 
+                                            }}
+                                        />
+                                        첫 번째 행(헤더) 특별 포맷팅 적용
+                                    </label>
+                                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4', paddingLeft: '24px' }}>
+                                        (첫 행 배경 RGB(0,114,186), 글자 흰색 11pt KoPub동음체Bold, 첫 행 내부 실선만 흰색 적용)
                                     </div>
-                                )}
+                                </div>
                             </div>
                         </div>
 
