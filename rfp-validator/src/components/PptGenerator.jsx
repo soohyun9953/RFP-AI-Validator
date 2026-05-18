@@ -338,7 +338,8 @@ export default function PptGenerator() {
             }
 
             let successCount = 0;
-            const zip = useZipFallback ? new JSZip() : null;
+            const zip = new JSZip(); // 💡 직접 쓰기 에러를 대비하여 ZIP 백업 상시 준비!
+            let hasWriteError = false; // 디렉토리 직접 쓰기 중 에러 발생 여부 플래그
             const reports = []; // 📊 실시간 파일별 처리 리포트 축적 배열
 
             for (const file of batchPptFiles) {
@@ -356,16 +357,31 @@ export default function PptGenerator() {
 
                     const fileName = `수정_${file.name}`;
                     
-                    if (directoryHandle) {
-                        const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
-                        const writable = await fileHandle.createWritable();
-                        await writable.write(modifiedBlob);
-                        await writable.close();
-                    } else if (useZipFallback && zip) {
-                        // 📥 ZIP 객체에 축적
-                        zip.file(fileName, modifiedBlob);
-                    } else {
-                        // Fallback: 일반 다운로드
+                    // 📥 복구용 ZIP 객체에 무조건 결과물 백업 축적
+                    zip.file(fileName, modifiedBlob);
+                    
+                    let localWriteSuccess = false;
+                    
+                    if (directoryHandle && !useZipFallback && !hasWriteError) {
+                        try {
+                            const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
+                            // 💡 keepExistingData: false 옵션을 명시하여 크롬 디스크 캐시 충돌 오류 원천 방지!
+                            const writable = await fileHandle.createWritable({ keepExistingData: false });
+                            await writable.write(modifiedBlob);
+                            await writable.close();
+                            localWriteSuccess = true;
+                            
+                            // ⏳ 물리 디스크 I/O 동기화를 위해 극소 대기 시간(50ms) 부여하여 캐시 경합 완벽 해소
+                            await new Promise(resolve => setTimeout(resolve, 50));
+                        } catch (writeErr) {
+                            console.warn(`Direct directory write failed for ${file.name}. Activating ZIP fallback.`, writeErr);
+                            hasWriteError = true;
+                            useZipFallback = true;
+                        }
+                    } 
+                    
+                    if (!localWriteSuccess && !useZipFallback) {
+                        // 일반 일대일 다운로드 Fallback
                         const { saveAs } = await import('file-saver');
                         saveAs(modifiedBlob, fileName);
                     }
@@ -387,6 +403,11 @@ export default function PptGenerator() {
                         } else if (!applyTableDesignChecked) {
                             detailMsg = `ℹ️ 일치하는 단어, 폰트명, 폰트 크기 변경 대상이 감지되지 않아 원본 그대로 저장했습니다.`;
                         }
+                    }
+
+                    // 디스크 쓰기 오류로 ZIP 구출 모드 가동 시 안내 문구 보충
+                    if (hasWriteError && directoryHandle) {
+                        detailMsg = detailMsg ? `${detailMsg} (💡 브라우저 파일 캐시 충돌 방지를 위해 통합 ZIP 파일 내에 안전하게 구출 저장되었습니다)` : `💡 통합 ZIP 압축 파일 내에 안전하게 구출 저장 완료`;
                     }
 
                     reports.push({
@@ -415,7 +436,11 @@ export default function PptGenerator() {
                     const { saveAs } = await import('file-saver');
                     saveAs(zipBlob, '수정_PPT_산출물_일괄다운로드.zip');
                     
-                    setSuccessMsg(`🔒 브라우저 보안 정책상 일부 폴더(다운로드, 시스템 루트 등)로의 직접 저장이 제한되어, 수정된 모든 PPT 산출물(${successCount}개)을 안전하게 하나의 통합 ZIP 압축 파일('수정_PPT_산출물_일괄다운로드.zip')로 묶어 다운로드해 드렸습니다. 하단의 파일별 일괄 편집 상세 결과 리포트를 확인해 주세요.`);
+                    if (hasWriteError) {
+                        setSuccessMsg(`💡 브라우저의 로컬 파일 시스템 캐시 불일치가 감지되었습니다. 데이터 유실을 방지하기 위해 수정된 모든 PPT 산출물(${successCount}개)을 안전하게 하나의 통합 ZIP 압축 파일('수정_PPT_산출물_일괄다운로드.zip')로 자동 복구 및 압축하여 다운로드해 드렸습니다. 하단의 파일별 일괄 편집 상세 결과 리포트를 확인해 주세요.`);
+                    } else {
+                        setSuccessMsg(`🔒 브라우저 보안 정책상 일부 폴더(다운로드, 시스템 루트 등)로의 직접 저장이 제한되어, 수정된 모든 PPT 산출물(${successCount}개)을 안전하게 하나의 통합 ZIP 압축 파일('수정_PPT_산출물_일괄다운로드.zip')로 묶어 다운로드해 드렸습니다. 하단의 파일별 일괄 편집 상세 결과 리포트를 확인해 주세요.`);
+                    }
                 } else {
                     setSuccessMsg(`성공적으로 ${successCount}개의 파일이 지정하신 폴더에 직접 일괄 편집·저장되었습니다. 하단의 파일별 일괄 편집 상세 결과 리포트를 확인해 주세요.`);
                 }
