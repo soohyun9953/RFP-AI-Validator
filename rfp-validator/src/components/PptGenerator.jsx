@@ -8,6 +8,7 @@ import {
     parseExcelData, generatePptFromTemplate, processPptBatch, 
     addSmartAnimationsToPpt, saveFileWithLocationPicker, getPptSlideCount 
 } from '../utils/pptExporter';
+import JSZip from 'jszip';
 
 export default function PptGenerator() {
     const [activeTab, setActiveTab] = useState('excel_mapping'); // 'excel_mapping' or 'batch_edit'
@@ -32,6 +33,7 @@ export default function PptGenerator() {
     const [fontRules, setFontRules] = useState('');
     const [fontSize, setFontSize] = useState('');
     const [applyDesignChecked, setApplyDesignChecked] = useState(false);
+    const [applyTableDesignChecked, setApplyTableDesignChecked] = useState(false);
     const [designTargetText, setDesignTargetText] = useState('');
     const [isProcessingBatch, setIsProcessingBatch] = useState(false);
     const [isDraggingBatch, setIsDraggingBatch] = useState(false);
@@ -297,8 +299,8 @@ export default function PptGenerator() {
             }
         }
 
-        if (parsedRules.length === 0 && parsedFontRules.length === 0 && !applyDesignChecked && parsedFontSizeRules.length === 0) {
-            setErrorMsg('적용할 단어 수정, 폰트 변경, 폰트 크기, 또는 텍스트 디자인 변경 중 하나 이상을 입력/선택해주세요.');
+        if (parsedRules.length === 0 && parsedFontRules.length === 0 && !applyDesignChecked && parsedFontSizeRules.length === 0 && !applyTableDesignChecked) {
+            setErrorMsg('적용할 단어 수정, 폰트 변경, 폰트 크기, 테이블 디자인 표준화, 또는 텍스트 디자인 변경 중 하나 이상을 입력/선택해주세요.');
             return;
         }
 
@@ -308,6 +310,8 @@ export default function PptGenerator() {
 
         try {
             let directoryHandle = null;
+            let useZipFallback = false;
+
             if ('showDirectoryPicker' in window) {
                 try {
                     directoryHandle = await window.showDirectoryPicker({
@@ -316,17 +320,23 @@ export default function PptGenerator() {
                         startIn: 'downloads'
                     });
                 } catch (err) {
-                    if (err.name !== 'AbortError') {
-                        console.error('Directory Picker Error:', err);
-                    } else {
-                        // 취소한 경우 중단
+                    if (err.name === 'AbortError') {
+                        // 사용자가 단순 취소한 경우 중단
                         setIsProcessingBatch(false);
                         return;
+                    } else {
+                        // ❌ 보안 제한 폴더 선택 혹은 브라우저 차단 발생 시 ZIP 폴백 활성화
+                        console.warn('Directory Picker security/permission block detected. Enabling ZIP Fallback.', err);
+                        useZipFallback = true;
                     }
                 }
+            } else {
+                // showDirectoryPicker를 미지원하는 브라우저도 ZIP 폴백 적용
+                useZipFallback = true;
             }
 
             let successCount = 0;
+            const zip = useZipFallback ? new JSZip() : null;
 
             for (const file of batchPptFiles) {
                 try {
@@ -335,6 +345,7 @@ export default function PptGenerator() {
                         fontRules: parsedFontRules,
                         fontSizeRules: parsedFontSizeRules,
                         applyDesign: applyDesignChecked, 
+                        applyTableDesign: applyTableDesignChecked, 
                         targetText: designTargetText 
                     };
                     const modifiedBlob = await processPptBatch(file, options);
@@ -346,6 +357,9 @@ export default function PptGenerator() {
                         const writable = await fileHandle.createWritable();
                         await writable.write(modifiedBlob);
                         await writable.close();
+                    } else if (useZipFallback && zip) {
+                        // 📥 ZIP 객체에 축적
+                        zip.file(fileName, modifiedBlob);
                     } else {
                         // Fallback: 일반 다운로드
                         const { saveAs } = await import('file-saver');
@@ -354,18 +368,29 @@ export default function PptGenerator() {
                     successCount++;
                 } catch (fileErr) {
                     console.error(`Error processing ${file.name}:`, fileErr);
-                    // 개별 파일 에러 시 다음 파일로 계속 진행 (사용자 알림 필요 시 추가 가능)
                 }
             }
 
             if (successCount > 0) {
-                setSuccessMsg(`성공적으로 ${successCount}개의 파일이 일괄 편집되어 저장되었습니다.`);
+                if (useZipFallback && zip) {
+                    // 📦 모든 파일 ZIP 압축 후 일괄 다운로드 실행
+                    const zipBlob = await zip.generateAsync({ type: 'blob' });
+                    const { saveAs } = await import('file-saver');
+                    saveAs(zipBlob, '수정_PPT_산출물_일괄다운로드.zip');
+                    
+                    setSuccessMsg(`🔒 브라우저 보안 정책상 일부 폴더(다운로드, 시스템 루트 등)로의 직접 저장이 제한되어, 수정된 모든 PPT 산출물(${successCount}개)을 안전하게 하나의 통합 ZIP 압축 파일('수정_PPT_산출물_일괄다운로드.zip')로 묶어 다운로드해 드렸습니다. (새 폴더를 만드시거나 다른 일반 폴더를 지정하시면 지정 폴더 내 직접 저장도 가능합니다.)`);
+                } else {
+                    setSuccessMsg(`성공적으로 ${successCount}개의 파일이 지정하신 폴더에 직접 일괄 편집·저장되었습니다.`);
+                }
                 setBatchPptFiles([]);
                 setReplaceRules('');
+                setFontRules('');
+                setFontSize('');
                 setApplyDesignChecked(false);
+                setApplyTableDesignChecked(false);
                 setDesignTargetText('');
             } else {
-                setErrorMsg('처리된 파일이 없습니다. 변경 대상 텍스트가 존재하는지 확인해주세요.');
+                setErrorMsg('처리된 파일이 없습니다. 변경 대상 텍스트나 디자인 요소가 존재하는지 확인해주세요.');
             }
         } catch (err) {
             console.error(err);
@@ -777,23 +802,39 @@ export default function PptGenerator() {
                                     </div>
                                 )}
                             </div>
+
+                            {/* 옵션 E: 테이블 표준 디자인 */}
+                            <div style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: '8px', border: '1px solid var(--panel-border)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={applyTableDesignChecked}
+                                        onChange={(e) => setApplyTableDesignChecked(e.target.checked)}
+                                        style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#a855f7' }}
+                                    />
+                                    옵션 E: 테이블(표) 표준 디자인 일괄 변경 적용
+                                </label>
+                                <div style={{ paddingLeft: '28px', fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                                    💡 모든 표 테두리 실선 0.5pt (#7F7F7F), 첫 행 배경색 RGB(0,114,186), 첫 행의 내부 실선만 흰색, 첫 행 글씨는 흰색 11pt KoPub동음체Bold로 통일성 있게 강제 포맷팅합니다.
+                                </div>
+                            </div>
                         </div>
 
                         <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
                             <button
                                 className="interactive"
                                 onClick={handleBatchProcess}
-                                disabled={batchPptFiles.length === 0 || isProcessingBatch || (!replaceRules.trim() && !applyDesignChecked)}
+                                disabled={batchPptFiles.length === 0 || isProcessingBatch || (!replaceRules.trim() && !fontRules.trim() && !fontSize.trim() && !applyDesignChecked && !applyTableDesignChecked)}
                                 style={{
                                     width: '100%',
                                     padding: '16px',
-                                    background: (batchPptFiles.length === 0 || isProcessingBatch || (!replaceRules.trim() && !applyDesignChecked)) ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #a855f7, #3b82f6)',
-                                    color: (batchPptFiles.length === 0 || isProcessingBatch || (!replaceRules.trim() && !applyDesignChecked)) ? 'var(--text-muted)' : 'white',
+                                    background: (batchPptFiles.length === 0 || isProcessingBatch || (!replaceRules.trim() && !fontRules.trim() && !fontSize.trim() && !applyDesignChecked && !applyTableDesignChecked)) ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #a855f7, #3b82f6)',
+                                    color: (batchPptFiles.length === 0 || isProcessingBatch || (!replaceRules.trim() && !fontRules.trim() && !fontSize.trim() && !applyDesignChecked && !applyTableDesignChecked)) ? 'var(--text-muted)' : 'white',
                                     border: 'none',
                                     borderRadius: '12px',
                                     fontSize: '16px',
                                     fontWeight: 700,
-                                    cursor: (batchPptFiles.length === 0 || isProcessingBatch || (!replaceRules.trim() && !applyDesignChecked)) ? 'not-allowed' : 'pointer',
+                                    cursor: (batchPptFiles.length === 0 || isProcessingBatch || (!replaceRules.trim() && !fontRules.trim() && !fontSize.trim() && !applyDesignChecked && !applyTableDesignChecked)) ? 'not-allowed' : 'pointer',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
                                 }}
                             >

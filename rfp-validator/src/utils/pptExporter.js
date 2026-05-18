@@ -633,10 +633,11 @@ export async function processPptBatch(pptFile, options) {
         fontRules = [], 
         fontSizeRules = [],
         applyDesign = false, 
+        applyTableDesign = false, 
         targetText = '' 
     } = options;
     
-    if (replaceRules.length === 0 && fontRules.length === 0 && !applyDesign && fontSizeRules.length === 0) {
+    if (replaceRules.length === 0 && fontRules.length === 0 && !applyDesign && fontSizeRules.length === 0 && !applyTableDesign) {
         throw new Error('적용할 변경 사항이 없습니다.');
     }
 
@@ -715,9 +716,254 @@ export async function processPptBatch(pptFile, options) {
     targetFiles.forEach(slidePath => {
         let slideXmlStr = zip.file(slidePath).asText();
         let fileChanged = false;
+        let designChanged = false;
         
         const xmlDoc = parser.parseFromString(slideXmlStr, 'application/xml');
         if (xmlDoc.getElementsByTagName('parsererror').length > 0) return;
+        
+        // [신규] 테이블(표) 표준 디자인 일괄 변경 로직
+        if (applyTableDesign && !slidePath.startsWith('ppt/theme/')) {
+            const nsA = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+            
+            // 💡 브라우저 네임스페이스 감지 실패 현상을 원천 방지하기 위해 전체 노드 순회 수집 적용
+            const tblElements = [];
+            const allNodes = xmlDoc.getElementsByTagName('*');
+            for (let i = 0; i < allNodes.length; i++) {
+                const node = allNodes[i];
+                if (node.nodeType === 1) {
+                    const localName = node.localName || node.tagName.split(':').pop();
+                    if (localName === 'tbl') {
+                        tblElements.push(node);
+                    }
+                }
+            }
+
+            let tableChanged = false;
+            for (let tIdx = 0; tIdx < tblElements.length; tIdx++) {
+                const tbl = tblElements[tIdx];
+                
+                // 테이블의 모든 행(a:tr) 수집
+                const trs = [];
+                for (let k = 0; k < tbl.childNodes.length; k++) {
+                    const child = tbl.childNodes[k];
+                    if (child.nodeType === 1) {
+                        const localName = child.localName || child.tagName.split(':').pop();
+                        if (localName === 'tr') {
+                            trs.push(child);
+                        }
+                    }
+                }
+                
+                // 각 행 및 셀 순회하며 포맷팅
+                for (let rIdx = 0; rIdx < trs.length; rIdx++) {
+                    const tr = trs[rIdx];
+                    
+                    // tr의 모든 셀(a:tc) 수집
+                    const tcs = [];
+                    for (let k = 0; k < tr.childNodes.length; k++) {
+                        const child = tr.childNodes[k];
+                        if (child.nodeType === 1) {
+                            const localName = child.localName || child.tagName.split(':').pop();
+                            if (localName === 'tc') {
+                                tcs.push(child);
+                            }
+                        }
+                    }
+                    
+                    for (let cIdx = 0; cIdx < tcs.length; cIdx++) {
+                        const tc = tcs[cIdx];
+                        
+                        // 셀 속성 tcPr 찾기 및 생성
+                        let tcPr = null;
+                        for (let k = 0; k < tc.childNodes.length; k++) {
+                            const child = tc.childNodes[k];
+                            if (child.nodeType === 1) {
+                                const localName = child.localName || child.tagName.split(':').pop();
+                                if (localName === 'tcPr') {
+                                    tcPr = child;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if (!tcPr) {
+                            tcPr = xmlDoc.createElementNS(nsA, 'a:tcPr');
+                            tc.insertBefore(tcPr, tc.firstChild);
+                        }
+                        
+                        // [규칙 1]: 모든 셀에 대해 테두리 선 굵기 0.5pt (w="6350"), 기본 색상 127,127,127 (#7F7F7F) 적용
+                        // 단, 첫 번째 행(rIdx === 0)의 내부 실선(경계선)만 흰색(#FFFFFF)으로 적용하고 외곽선은 회색(#7F7F7F) 유지
+                        const borderNames = ['lnL', 'lnR', 'lnT', 'lnB'];
+                        
+                        // 1. 기존에 존재할 수 있는 모든 테두리 노드들을 완벽하게 선제적으로 제거하여 중복 및 굵기 간섭 원천 방지
+                        borderNames.forEach(bName => {
+                            const existingLns = [];
+                            for (let k = 0; k < tcPr.childNodes.length; k++) {
+                                const child = tcPr.childNodes[k];
+                                if (child.nodeType === 1 && (child.localName === bName || child.tagName.split(':').pop() === bName)) {
+                                    existingLns.push(child);
+                                }
+                            }
+                            existingLns.forEach(el => tcPr.removeChild(el));
+                        });
+                        
+                        // 2. 테두리 노드들을 역순으로 tcPr의 맨 첫머리에 insertBefore 하여 DrawingML의 엄격한 자식 시퀀스 순서(ln이 solidFill보다 앞에 와야 함)를 200% 완벽 준수!
+                        // 역순 ['lnB', 'lnT', 'lnR', 'lnL'] 로 insertBefore(firstChild)를 하면
+                        // 최종 tcPr 자식 순서는 [lnL, lnR, lnT, lnB, ...] 가 되어 XSD 스키마와 100% 정확하게 정렬됩니다!
+                        const reversedBNames = ['lnB', 'lnT', 'lnR', 'lnL'];
+                        
+                        reversedBNames.forEach(bName => {
+                            let borderColor = '7F7F7F'; // 기본 회색 (#7F7F7F)
+                            
+                            if (rIdx === 0) {
+                                if (bName === 'lnB') {
+                                    // 첫 행의 아래선은 첫째 행 and 둘째 행 사이의 내부 수평 실선이므로 흰색 적용
+                                    borderColor = 'FFFFFF';
+                                } else if (bName === 'lnL') {
+                                    // 첫 행의 왼쪽선은 맨 왼쪽 외곽선(cIdx === 0)이 아니면 내부 수직 실선이므로 흰색 적용
+                                    borderColor = (cIdx === 0) ? '7F7F7F' : 'FFFFFF';
+                                } else if (bName === 'lnR') {
+                                    // 첫 행의 오른쪽선은 맨 오른쪽 외곽선(cIdx === tcs.length - 1)이 아니면 내부 수직 실선이므로 흰색 적용
+                                    const isLastCol = (cIdx === tcs.length - 1);
+                                    borderColor = isLastCol ? '7F7F7F' : 'FFFFFF';
+                                } else if (bName === 'lnT') {
+                                    // 첫 행의 위선은 표 전체의 맨 위 외곽선이므로 회색 고정
+                                    borderColor = '7F7F7F';
+                                }
+                            }
+                            
+                            const ln = xmlDoc.createElementNS(nsA, `a:${bName}`);
+                            ln.setAttribute('w', '6350'); // 0.5pt (1 pt = 12700 EMU -> 0.5 pt = 6350 EMU)
+                            ln.setAttribute('cmpd', 'sng'); // 단일선 (Single line)
+                            ln.setAttribute('cap', 'flat'); // 캡 스타일 평평하게
+                            
+                            const solidFill = xmlDoc.createElementNS(nsA, 'a:solidFill');
+                            const srgbClr = xmlDoc.createElementNS(nsA, 'a:srgbClr');
+                            srgbClr.setAttribute('val', borderColor); // 결정된 정밀 색상 주입
+                            solidFill.appendChild(srgbClr);
+                            ln.appendChild(solidFill);
+                            
+                            const prstDash = xmlDoc.createElementNS(nsA, 'a:prstDash');
+                            prstDash.setAttribute('val', 'solid'); // 실선
+                            ln.appendChild(prstDash);
+                            
+                            // tcPr의 첫 번째 자식으로 정교하게 삽입하여 스키마 정합성 보장!
+                            tcPr.insertBefore(ln, tcPr.firstChild);
+                        });
+                        
+                        // [규칙 2]: 첫 번째 행 (rIdx === 0) 인 경우 특별 포맷팅 적용
+                        if (rIdx === 0) {
+                            // 1. 셀 배경색 채우기: RGB 0,112,192 (#0070C0)
+                            let existingFill = null;
+                            for (let k = 0; k < tcPr.childNodes.length; k++) {
+                                const child = tcPr.childNodes[k];
+                                if (child.nodeType === 1 && (child.localName === 'solidFill' || child.tagName.split(':').pop() === 'solidFill')) {
+                                    existingFill = child;
+                                    break;
+                                }
+                            }
+                            if (existingFill) {
+                                tcPr.removeChild(existingFill);
+                            }
+                            
+                            const bgSolidFill = xmlDoc.createElementNS(nsA, 'a:solidFill');
+                            const bgSrgbClr = xmlDoc.createElementNS(nsA, 'a:srgbClr');
+                            bgSrgbClr.setAttribute('val', '0072BA'); // 첫행 채우기색 0,114,186 (RGB 0,114,186)
+                            bgSolidFill.appendChild(bgSrgbClr);
+                            tcPr.appendChild(bgSolidFill);
+                            
+                            // 2. 첫 행의 텍스트 스타일링: 흰색, 11pt, KoPub동음체Bold (런속성 rPr 누락 대응형 강제 바인딩)
+                            const textRuns = [];
+                            const tcNodes = tc.getElementsByTagName('*');
+                            for (let k = 0; k < tcNodes.length; k++) {
+                                const node = tcNodes[k];
+                                if (node.nodeType === 1) {
+                                    const localName = node.localName || node.tagName.split(':').pop();
+                                    if (localName === 'r' || localName === 'endParaRPr' || localName === 'defRPr') {
+                                        textRuns.push(node);
+                                    }
+                                }
+                            }
+                            
+                            for (let tR = 0; tR < textRuns.length; tR++) {
+                                const run = textRuns[tR];
+                                const localName = run.localName || run.tagName.split(':').pop();
+                                
+                                let rPr = null;
+                                if (localName === 'endParaRPr' || localName === 'defRPr') {
+                                    rPr = run;
+                                } else {
+                                    // r 요소인 경우 하위 rPr 검색 및 생성
+                                    for (let k = 0; k < run.childNodes.length; k++) {
+                                        const child = run.childNodes[k];
+                                        if (child.nodeType === 1 && (child.localName === 'rPr' || child.tagName.split(':').pop() === 'rPr')) {
+                                            rPr = child;
+                                            break;
+                                        }
+                                    }
+                                    if (!rPr) {
+                                        rPr = xmlDoc.createElementNS(nsA, 'a:rPr');
+                                        run.insertBefore(rPr, run.firstChild);
+                                    }
+                                }
+                                
+                                if (rPr) {
+                                    rPr.setAttribute('sz', '1100'); // 11pt
+                                    rPr.setAttribute('b', '1'); // Bold
+                                    
+                                    // 글씨색 흰색으로 변경
+                                    let textFill = null;
+                                    for (let k = 0; k < rPr.childNodes.length; k++) {
+                                        const child = rPr.childNodes[k];
+                                        if (child.nodeType === 1 && (child.localName === 'solidFill' || child.tagName.split(':').pop() === 'solidFill')) {
+                                            textFill = child;
+                                            break;
+                                        }
+                                    }
+                                    if (textFill) {
+                                        rPr.removeChild(textFill);
+                                    }
+                                    
+                                    const textSolidFill = xmlDoc.createElementNS(nsA, 'a:solidFill');
+                                    const textSrgbClr = xmlDoc.createElementNS(nsA, 'a:srgbClr');
+                                    textSrgbClr.setAttribute('val', 'FFFFFF'); // 흰색
+                                    textSolidFill.appendChild(textSrgbClr);
+                                    
+                                    // 스키마 시퀀스 안정을 위해 rPr의 맨 처음에 삽입
+                                    rPr.insertBefore(textSolidFill, rPr.firstChild);
+                                    
+                                    // 폰트 변경 (latin, ea, cs)
+                                    const fontTypes = ['latin', 'ea', 'cs'];
+                                    fontTypes.forEach(fType => {
+                                        let fontEl = null;
+                                        for (let k = 0; k < rPr.childNodes.length; k++) {
+                                            const child = rPr.childNodes[k];
+                                            if (child.nodeType === 1 && (child.localName === fType || child.tagName.split(':').pop() === fType)) {
+                                                fontEl = child;
+                                                break;
+                                            }
+                                        }
+                                        if (fontEl) {
+                                            fontEl.setAttribute('typeface', 'KoPub동음체Bold');
+                                        } else {
+                                            fontEl = xmlDoc.createElementNS(nsA, `a:${fType}`);
+                                            fontEl.setAttribute('typeface', 'KoPub동음체Bold');
+                                            rPr.appendChild(fontEl);
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+                tableChanged = true;
+            }
+            if (tableChanged) {
+                slideXmlStr = serializer.serializeToString(xmlDoc);
+                fileChanged = true;
+                hasChanges = true;
+            }
+        }
         
         const allElements = xmlDoc.getElementsByTagName('*');
         
@@ -873,7 +1119,7 @@ export async function processPptBatch(pptFile, options) {
                     rPr.insertBefore(ln, rPr.firstChild);
                 }
 
-                let designChanged = false;
+                designChanged = false;
                 const allElementsInner = xmlDocInner.getElementsByTagName('*');
                 for (let i = 0; i < allElementsInner.length; i++) {
                     const el = allElementsInner[i];
@@ -908,6 +1154,11 @@ export async function processPptBatch(pptFile, options) {
                     fileChanged = true;
                 }
             }
+        }
+        
+        // 단어/폰트/크기/테이블 수정 루프에서 변경이 가해진 경우 최종 xmlDoc 동기화
+        if (fileChanged && !designChanged) {
+            slideXmlStr = serializer.serializeToString(xmlDoc);
         }
         
         // 변경사항이 있으면 압축 파일 갱신

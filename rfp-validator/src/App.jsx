@@ -8,6 +8,7 @@ import PptGenerator from './components/PptGenerator';
 import MeetingMinutes from './components/MeetingMinutes';
 import AiPptDesigner from './components/AiPptDesigner';
 import RagKnowledgeBase from './components/RagKnowledgeBase';
+import IsmpDaDashboard from './components/IsmpDaDashboard';
 import { 
   Shield, 
   Activity, 
@@ -35,7 +36,8 @@ import {
   Eye,
   EyeOff,
   Sun,
-  Moon
+  Moon,
+  Sliders
 } from 'lucide-react';
 import { processFile } from './utils/fileExtractor';
 
@@ -138,6 +140,7 @@ function App() {
 
   const tabs = [
     { id: 'main', label: 'AI 산출물 검증', icon: Shield, color: 'var(--accent-blue)' },
+    { id: 'ismpda', label: '(작업중)ISMP DA 검증 대시보드', icon: Sliders, color: 'var(--accent-purple)' },
     { id: 'typo', label: 'AI 교정교열', icon: CheckCircle2, color: 'var(--accent-purple)' },
     { id: 'law', label: 'AI 법률 자문(제미나이)', icon: MessageSquare, color: 'var(--success-color)' },
     { id: 'law-mcp', label: 'AI 법률 자문(로컬 RAG)', icon: MessageSquare, color: 'var(--accent-purple)' },
@@ -414,6 +417,7 @@ function App() {
 
         <div className="content-body">
           {activeTab === 'main' && <DocumentValidator apiKey={apiKey} />}
+          {activeTab === 'ismpda' && <IsmpDaDashboard />}
           {activeTab === 'typo' && <TypoValidator apiKey={apiKey} />}
           {activeTab === 'law' && <LawConsultant apiKey={apiKey} isMcpMode={false} />}
           {activeTab === 'law-mcp' && <LawConsultant apiKey={apiKey} isMcpMode={true} />}
