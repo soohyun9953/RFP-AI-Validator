@@ -650,6 +650,7 @@ export async function processPptBatch(pptFile, options) {
     const nsA = 'http://schemas.openxmlformats.org/drawingml/2006/main';
     
     let hasChanges = false;
+    let totalTablesCount = 0; // PPT 내에 감지된 총 테이블(표) 요소 개수 누적기
     
     // 타겟 슬라이드 XML 파일 목록
     const targetFiles = allFiles.filter(p => p.endsWith('.xml') && 
@@ -738,6 +739,7 @@ export async function processPptBatch(pptFile, options) {
                 }
             }
 
+            totalTablesCount += tblElements.length;
             let tableChanged = false;
             for (let tIdx = 0; tIdx < tblElements.length; tIdx++) {
                 const tbl = tblElements[tIdx];
@@ -915,46 +917,51 @@ export async function processPptBatch(pptFile, options) {
                                     rPr.setAttribute('sz', '1100'); // 11pt
                                     rPr.setAttribute('b', '1'); // Bold
                                     
-                                    // 글씨색 흰색으로 변경
-                                    let textFill = null;
-                                    for (let k = 0; k < rPr.childNodes.length; k++) {
-                                        const child = rPr.childNodes[k];
-                                        if (child.nodeType === 1 && (child.localName === 'solidFill' || child.tagName.split(':').pop() === 'solidFill')) {
-                                            textFill = child;
-                                            break;
-                                        }
-                                    }
-                                    if (textFill) {
-                                        rPr.removeChild(textFill);
-                                    }
+                                    // 💡 endParaRPr 또는 defRPr 인 속성 전용 노드는 자식 엘리먼트(solidFill, font) 삽입 시 DOMException이 발생하므로 속성값만 세팅하고 자식 삽입은 안전하게 우회!
+                                    const isAttrOnlyNode = (localName === 'endParaRPr' || localName === 'defRPr');
                                     
-                                    const textSolidFill = xmlDoc.createElementNS(nsA, 'a:solidFill');
-                                    const textSrgbClr = xmlDoc.createElementNS(nsA, 'a:srgbClr');
-                                    textSrgbClr.setAttribute('val', 'FFFFFF'); // 흰색
-                                    textSolidFill.appendChild(textSrgbClr);
-                                    
-                                    // 스키마 시퀀스 안정을 위해 rPr의 맨 처음에 삽입
-                                    rPr.insertBefore(textSolidFill, rPr.firstChild);
-                                    
-                                    // 폰트 변경 (latin, ea, cs)
-                                    const fontTypes = ['latin', 'ea', 'cs'];
-                                    fontTypes.forEach(fType => {
-                                        let fontEl = null;
+                                    if (!isAttrOnlyNode) {
+                                        // 글씨색 흰색으로 변경
+                                        let textFill = null;
                                         for (let k = 0; k < rPr.childNodes.length; k++) {
                                             const child = rPr.childNodes[k];
-                                            if (child.nodeType === 1 && (child.localName === fType || child.tagName.split(':').pop() === fType)) {
-                                                fontEl = child;
+                                            if (child.nodeType === 1 && (child.localName === 'solidFill' || child.tagName.split(':').pop() === 'solidFill')) {
+                                                textFill = child;
                                                 break;
                                             }
                                         }
-                                        if (fontEl) {
-                                            fontEl.setAttribute('typeface', 'KoPub동음체Bold');
-                                        } else {
-                                            fontEl = xmlDoc.createElementNS(nsA, `a:${fType}`);
-                                            fontEl.setAttribute('typeface', 'KoPub동음체Bold');
-                                            rPr.appendChild(fontEl);
+                                        if (textFill) {
+                                            rPr.removeChild(textFill);
                                         }
-                                    });
+                                        
+                                        const textSolidFill = xmlDoc.createElementNS(nsA, 'a:solidFill');
+                                        const textSrgbClr = xmlDoc.createElementNS(nsA, 'a:srgbClr');
+                                        textSrgbClr.setAttribute('val', 'FFFFFF'); // 흰색
+                                        textSolidFill.appendChild(textSrgbClr);
+                                        
+                                        // 스키마 시퀀스 안정을 위해 rPr의 맨 처음에 삽입
+                                        rPr.insertBefore(textSolidFill, rPr.firstChild);
+                                        
+                                        // 폰트 변경 (latin, ea, cs)
+                                        const fontTypes = ['latin', 'ea', 'cs'];
+                                        fontTypes.forEach(fType => {
+                                            let fontEl = null;
+                                            for (let k = 0; k < rPr.childNodes.length; k++) {
+                                                const child = rPr.childNodes[k];
+                                                if (child.nodeType === 1 && (child.localName === fType || child.tagName.split(':').pop() === fType)) {
+                                                    fontEl = child;
+                                                    break;
+                                                }
+                                            }
+                                            if (fontEl) {
+                                                fontEl.setAttribute('typeface', 'KoPub동음체Bold');
+                                            } else {
+                                                fontEl = xmlDoc.createElementNS(nsA, `a:${fType}`);
+                                                fontEl.setAttribute('typeface', 'KoPub동음체Bold');
+                                                rPr.appendChild(fontEl);
+                                            }
+                                        });
+                                    }
                                 }
                             }
                         }
@@ -1180,6 +1187,10 @@ export async function processPptBatch(pptFile, options) {
         type: 'blob',
         mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
     });
+
+    // 💡 동적 커스텀 프로퍼티 바인딩으로 파일별 수정 메타데이터 보존
+    blob.totalTablesCount = totalTablesCount;
+    blob.hasChanges = hasChanges;
 
     return blob;
 }

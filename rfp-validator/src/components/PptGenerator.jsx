@@ -38,6 +38,7 @@ export default function PptGenerator() {
     const [designTargetText, setDesignTargetText] = useState('');
     const [isProcessingBatch, setIsProcessingBatch] = useState(false);
     const [isDraggingBatch, setIsDraggingBatch] = useState(false);
+    const [batchReport, setBatchReport] = useState([]); // 📊 일괄 편집 결과 상세 피드백 리포트 리스트
 
     // PPT 스마트 애니메이션 관련 State
     const [animationPptFile, setAnimationPptFile] = useState(null);
@@ -338,6 +339,7 @@ export default function PptGenerator() {
 
             let successCount = 0;
             const zip = useZipFallback ? new JSZip() : null;
+            const reports = []; // 📊 실시간 파일별 처리 리포트 축적 배열
 
             for (const file of batchPptFiles) {
                 try {
@@ -367,11 +369,44 @@ export default function PptGenerator() {
                         const { saveAs } = await import('file-saver');
                         saveAs(modifiedBlob, fileName);
                     }
+
+                    // 📊 상세 피드백 메시지 동적 조립
+                    let detailMsg = '';
+                    if (applyTableDesignChecked) {
+                        if (modifiedBlob.totalTablesCount > 0) {
+                            detailMsg = `표(Table) ${modifiedBlob.totalTablesCount}개 표준화 및 첫 행 스타일 적용 완료`;
+                        } else {
+                            detailMsg = `⚠️ 표(Table) 요소가 존재하지 않아 표 디자인 변경을 생략하고 원본 그대로 저장했습니다.`;
+                        }
+                    }
+                    
+                    if (parsedRules.length > 0 || parsedFontRules.length > 0 || parsedFontSizeRules.length > 0 || applyDesignChecked) {
+                        if (modifiedBlob.hasChanges) {
+                            const textChangesStr = '단어/폰트/크기/외곽선 일괄 수정 적용 완료';
+                            detailMsg = detailMsg ? `${detailMsg} (${textChangesStr})` : textChangesStr;
+                        } else if (!applyTableDesignChecked) {
+                            detailMsg = `ℹ️ 일치하는 단어, 폰트명, 폰트 크기 변경 대상이 감지되지 않아 원본 그대로 저장했습니다.`;
+                        }
+                    }
+
+                    reports.push({
+                        fileName: file.name,
+                        status: 'success',
+                        detail: detailMsg || '변경 사항 없음 (원본 그대로 저장 완료)'
+                    });
+
                     successCount++;
                 } catch (fileErr) {
                     console.error(`Error processing ${file.name}:`, fileErr);
+                    reports.push({
+                        fileName: file.name,
+                        status: 'error',
+                        detail: `❌ 처리 실패: ${fileErr.message || 'PPT 내부 구조 파싱 에러'}`
+                    });
                 }
             }
+
+            setBatchReport(reports);
 
             if (successCount > 0) {
                 if (useZipFallback && zip) {
@@ -380,9 +415,9 @@ export default function PptGenerator() {
                     const { saveAs } = await import('file-saver');
                     saveAs(zipBlob, '수정_PPT_산출물_일괄다운로드.zip');
                     
-                    setSuccessMsg(`🔒 브라우저 보안 정책상 일부 폴더(다운로드, 시스템 루트 등)로의 직접 저장이 제한되어, 수정된 모든 PPT 산출물(${successCount}개)을 안전하게 하나의 통합 ZIP 압축 파일('수정_PPT_산출물_일괄다운로드.zip')로 묶어 다운로드해 드렸습니다. (새 폴더를 만드시거나 다른 일반 폴더를 지정하시면 지정 폴더 내 직접 저장도 가능합니다.)`);
+                    setSuccessMsg(`🔒 브라우저 보안 정책상 일부 폴더(다운로드, 시스템 루트 등)로의 직접 저장이 제한되어, 수정된 모든 PPT 산출물(${successCount}개)을 안전하게 하나의 통합 ZIP 압축 파일('수정_PPT_산출물_일괄다운로드.zip')로 묶어 다운로드해 드렸습니다. 하단의 파일별 일괄 편집 상세 결과 리포트를 확인해 주세요.`);
                 } else {
-                    setSuccessMsg(`성공적으로 ${successCount}개의 파일이 지정하신 폴더에 직접 일괄 편집·저장되었습니다.`);
+                    setSuccessMsg(`성공적으로 ${successCount}개의 파일이 지정하신 폴더에 직접 일괄 편집·저장되었습니다. 하단의 파일별 일괄 편집 상세 결과 리포트를 확인해 주세요.`);
                 }
                 setBatchPptFiles([]);
                 setReplaceRules('');
@@ -886,6 +921,54 @@ export default function PptGenerator() {
                                     <><Play size={20} /> 저장할 폴더 선택 및 일괄 편집 실행</>
                                 )}
                             </button>
+                            
+                            {batchReport.length > 0 && (
+                                <div className="animate-slide-up" style={{ 
+                                    marginTop: '20px', 
+                                    background: 'rgba(255,255,255,0.02)', 
+                                    border: '1px solid var(--panel-border)', 
+                                    borderRadius: '12px', 
+                                    padding: '16px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '12px'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--panel-border)', paddingBottom: '8px' }}>
+                                        <Info size={16} color="#a855f7" />
+                                        <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-primary)' }}>일괄 편집 세부 처리 결과 리포트</span>
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '220px', overflowY: 'auto', paddingRight: '4px' }}>
+                                        {batchReport.map((rep, idx) => (
+                                            <div key={idx} style={{ 
+                                                display: 'flex', 
+                                                flexDirection: 'column', 
+                                                gap: '6px', 
+                                                padding: '10px', 
+                                                borderRadius: '8px', 
+                                                background: rep.status === 'success' ? 'rgba(16, 185, 129, 0.05)' : 'rgba(239, 68, 68, 0.05)',
+                                                borderLeft: `3px solid ${rep.status === 'success' ? '#10b981' : '#ef4444'}`
+                                            }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-all' }}>{rep.fileName}</span>
+                                                    <span style={{ 
+                                                        fontSize: '11px', 
+                                                        fontWeight: 700, 
+                                                        padding: '2px 6px', 
+                                                        borderRadius: '4px',
+                                                        background: rep.status === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                                        color: rep.status === 'success' ? '#10b981' : '#ef4444'
+                                                    }}>
+                                                        {rep.status === 'success' ? '수정 완료' : '실패'}
+                                                    </span>
+                                                </div>
+                                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                                                    {rep.detail}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 ) : activeTab === 'smart_animation' ? (
